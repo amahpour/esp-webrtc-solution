@@ -14,6 +14,7 @@
 #include "common.h"
 #include "esp_log.h"
 #include <cJSON.h>
+#include "display.h"
 
 #define TAG                   "OPENAI_SIGNALING"
 
@@ -308,6 +309,20 @@ static int openai_signaling_send_msg(esp_peer_signaling_handle_t h, esp_peer_sig
             if (sig->remote_sdp) {
                 int print_size = sig->remote_sdp_size < 256 ? sig->remote_sdp_size : 256;
                 ESP_LOGE(TAG, "Realtime call failed, response: %.*s", print_size, (char *)sig->remote_sdp);
+                cJSON *err_root = cJSON_ParseWithLength((char *)sig->remote_sdp, sig->remote_sdp_size);
+                const cJSON *err = err_root ? cJSON_GetObjectItemCaseSensitive(err_root, "error") : NULL;
+                const cJSON *msg = err ? cJSON_GetObjectItemCaseSensitive(err, "message") : NULL;
+                /* first sentence only: "You have no credits remaining." not the whole billing URL */
+                char reason[100] = "see log";
+                if (cJSON_IsString(msg)) {
+                    snprintf(reason, sizeof(reason), "%s", msg->valuestring);
+                    char *dot = strstr(reason, ". ");
+                    if (dot) {
+                        dot[1] = 0;
+                    }
+                }
+                display_set_error("OpenAI rejected the call:\n%s", reason);
+                cJSON_Delete(err_root);
             }
             ESP_LOGE(TAG, "Fail to post data to %s", OPENAI_REALTIME_CALLS_URL);
             return -1;

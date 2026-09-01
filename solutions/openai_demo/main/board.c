@@ -5,6 +5,8 @@
 #include "esp_codec_dev.h"
 #include "sdkconfig.h"
 #include "settings.h"
+#include "bench_dac.h"
+#include "display.h"
 
 static const char *TAG = "Board";
 
@@ -21,4 +23,8 @@ void init_board(void)
         .reuse_dev = false
     };
     init_codec(&cfg);
+    // Bench DAC bus on the dock connector (SCL GPIO40 / SDA GPIO41), separate from the codec I2C
+    bench_dac_init();
+    display_init();
+    display_set_status("Connecting to WiFi...");
 }
