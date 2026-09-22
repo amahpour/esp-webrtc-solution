@@ -1,0 +1,902 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BOX-3 Voice Lab Architecture</title>
+<meta name="description" content="How Espressif's openai_demo became a voice-driven bench lab assistant on the ESP32-S3-BOX-3: architecture before and after, one request end to end, and the session lifecycle.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23B04E1C'/%3E%3Cpath d='M7 20h6l3-9 3 12 2-6h4' fill='none' stroke='%23FFF8F2' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&amp;family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#F4F1E8;color:#1A1917;font-family:'IBM Plex Sans', system-ui, sans-serif}
+a{color:#A2471A}a:hover{color:#7E3511}
+code{font-family:'IBM Plex Mono', ui-monospace, monospace;font-size:.9em}
+.dg text{font-family:'IBM Plex Sans', system-ui, sans-serif;fill:#1A1917}
+.dg .t{font-size:15px;font-weight:600}
+.dg .t2{font-size:13px;font-weight:600}
+.dg .tl{font-size:17px;font-weight:600}
+.dg .sl{font-size:13.5px;fill:#4F4B44}
+.dg .s{font-size:12.5px;fill:#4F4B44}
+.dg .s2{font-size:12px;fill:#4F4B44}
+.dg .m{font-family:'IBM Plex Mono', ui-monospace, monospace;font-size:11.5px}
+.dg .g{fill:#6B665E}
+.dg .cu{fill:#A2471A}
+.dg .ok{fill:#2F6B3A}
+.dg .bad{fill:#A3302A}
+.dg .mid{text-anchor:middle}
+.dg .end{text-anchor:end}
+.dg .bl{font-family:'IBM Plex Mono', ui-monospace, monospace;font-size:11.5px;font-weight:500;letter-spacing:.14em;fill:#5E594F}
+.dg .tg{font-family:'IBM Plex Mono', ui-monospace, monospace;font-size:9.5px;font-weight:500;letter-spacing:.1em;fill:#A2471A}
+.dg .tgw{fill:#FFF8F2}
+.dg .tgg{fill:#6B665E}
+.dg .band{fill:#EAE5D8}
+.dg .up{fill:#FFFDF8;stroke:#3D5A73;stroke-width:1.5}
+.dg .chg{fill:#FFFDF8;stroke:#B04E1C;stroke-width:2}
+.dg .new{fill:#FBEADF;stroke:#B04E1C;stroke-width:2}
+.dg .stub{fill:#F4F1E8;stroke:#8A847A;stroke-width:1.5;stroke-dasharray:6 5}
+.dg .err{fill:#FFFDF8;stroke:#A3302A;stroke-width:2}
+.dg .sub{fill:#FFFDF8;stroke:#D6CFBF;stroke-width:1}
+.dg .subn{fill:#FBEADF;stroke:#B04E1C;stroke-width:1.2}
+.dg .ln{fill:none;stroke:#1A1917;stroke-width:1.5}
+.dg .lnc{fill:none;stroke:#B04E1C;stroke-width:2}
+.dg .lng{fill:none;stroke:#8A847A;stroke-width:1.5;stroke-dasharray:5 4}
+.dg .lnd{fill:none;stroke:#1A1917;stroke-width:1.2;stroke-dasharray:5 4}
+.dg .lnr{fill:none;stroke:#A3302A;stroke-width:1.5}
+.dg .life{fill:none;stroke:#B3AB99;stroke-width:1.2;stroke-dasharray:3 5}
+.dg .ah{fill:#1A1917}
+.dg .ahc{fill:#B04E1C}
+.dg .ahg{fill:#8A847A}
+.dg .ahr{fill:#A3302A}
+.dg .pbg{fill:#F4F1E8}
+.dg .bbg{fill:#EAE5D8}
+.dg .tgnew{fill:#B04E1C}
+.dg .tgchg{fill:#FFFDF8;stroke:#B04E1C;stroke-width:1.2}
+.dg .tgstub{fill:#F4F1E8;stroke:#8A847A;stroke-width:1.2}
+
+html{scroll-behavior:smooth;color-scheme:light}
+.top{position:sticky;top:0;z-index:5;background:rgba(244,241,232,.94);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-bottom:1px solid #D6CFBF}
+.top .in{max-width:1440px;margin:0 auto;padding:12px 64px;box-sizing:border-box;display:flex;gap:22px;align-items:center;overflow-x:auto;white-space:nowrap;font-size:14px}
+.top a{color:#4F4B44;text-decoration:none}.top a:hover{color:#A2471A}
+.top .brand{font-family:'IBM Plex Mono', ui-monospace, monospace;font-size:12px;font-weight:500;letter-spacing:.14em;color:#A2471A;margin-right:auto}
+.board{width:auto!important;height:auto!important;max-width:1440px;margin:0 auto;scroll-margin-top:52px}
+.board+.board{border-top:1px solid #D6CFBF}
+.dgw,.tblw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tbl{min-width:900px}
+@media (max-width:1100px){.dgw svg{min-width:1000px}}
+@media (max-width:900px){
+.board{padding:40px 16px!important}
+.top .in{padding:10px 16px}
+.h1{font-size:46px!important}
+.h2{font-size:32px!important}
+.big{font-size:28px!important}
+.glance,.gl{grid-template-columns:minmax(0,1fr)!important}
+.stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+.split{flex-direction:column!important;gap:12px!important}
+}
+</style>
+</head>
+<body>
+<nav class="top" aria-label="Sections"><div class="in"><span class="brand">BOX-3 VOICE LAB</span>
+<a href="#overview">Overview</a><a href="#glance">At a glance</a><a href="#before">Before</a><a href="#after">After</a><a href="#toolcall">Tool call</a><a href="#lifecycle">Lifecycle</a><a href="#changes">What changed</a><a href="#glossary">Glossary</a>
+</div></nav>
+<main>
+<div class="board" id="overview" style="width: 1440px; height: 780px; box-sizing: border-box; padding: 72px 64px 64px; display: flex; flex-direction: column; background: #F4F1E8; color: #1A1917; font-family: 'IBM Plex Sans', system-ui, sans-serif;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A;">ESP32-S3-BOX-3 · OPENAI REALTIME · ARCHITECTURE</div>
+<h1 class="h1" style="margin: 20px 0 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 76px; line-height: 1.02; letter-spacing: -0.02em; max-width: 1100px;">From printf stubs to real electrons</h1>
+<p style="margin: 24px 0 0; max-width: 900px; font-size: 21px; line-height: 1.55; color: #4F4B44;">Espressif's <code>openai_demo</code> streams speech to OpenAI's Realtime API over WebRTC and hands the model a smart-home toolset whose handlers only print. This fork moves it to the ESP32-S3-BOX-3 and makes the tools move hardware: a spoken request becomes an I2C write to a bench DAC, inside limits the firmware enforces.</p>
+<div class="stats" style="margin-top: 44px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px;">
+<div style="padding: 20px 22px; background: #FFFDF8; border: 1px solid #D6CFBF; border-radius: 12px; display: flex; flex-direction: column; gap: 10px;">
+<div class="big" style="font-family: Fraunces, Georgia, serif; font-size: 40px; font-weight: 600; line-height: 1; color: #A2471A;">6 → 3</div>
+<div style="font-size: 15px; line-height: 1.45; color: #4F4B44;">printf setters replaced by three tools that move real hardware</div>
+</div>
+<div style="padding: 20px 22px; background: #FFFDF8; border: 1px solid #D6CFBF; border-radius: 12px; display: flex; flex-direction: column; gap: 10px;">
+<div class="big" style="font-family: Fraunces, Georgia, serif; font-size: 40px; font-weight: 600; line-height: 1; color: #A2471A;">1.801 V</div>
+<div style="font-size: 15px; line-height: 1.45; color: #4F4B44;">measured on the DAC output for a commanded 1800 mV</div>
+</div>
+<div style="padding: 20px 22px; background: #FFFDF8; border: 1px solid #D6CFBF; border-radius: 12px; display: flex; flex-direction: column; gap: 10px;">
+<div class="big" style="font-family: Fraunces, Georgia, serif; font-size: 40px; font-weight: 600; line-height: 1; color: #A2471A;">0 bytes</div>
+<div style="font-size: 15px; line-height: 1.45; color: #4F4B44;">sent to OpenAI while idle: the wake word runs on the S3</div>
+</div>
+<div style="padding: 20px 22px; background: #FFFDF8; border: 1px solid #D6CFBF; border-radius: 12px; display: flex; flex-direction: column; gap: 10px;">
+<div class="big" style="font-family: Fraunces, Georgia, serif; font-size: 40px; font-weight: 600; line-height: 1; color: #A2471A;">+1,714 −149</div>
+<div style="font-size: 15px; line-height: 1.45; color: #4F4B44;">lines across 16 files in <code>openai_demo</code>, plus a vendored <code>esp_capture</code> with 2 edits</div>
+</div>
+</div>
+<div style="margin-top: 36px; display: flex; flex-wrap: wrap; gap: 14px 28px; align-items: center; font-size: 14px; color: #4F4B44;">
+<span style="display: flex; align-items: center; gap: 10px;"><span style="width: 34px; height: 20px; border-radius: 5px; box-sizing: border-box; background: #FFFDF8; border: 1.5px solid #3D5A73;"></span>Upstream, unchanged</span>
+<span style="display: flex; align-items: center; gap: 10px;"><span style="width: 34px; height: 20px; border-radius: 5px; box-sizing: border-box; background: #FFFDF8; border: 2px solid #B04E1C;"></span>Changed in this fork</span>
+<span style="display: flex; align-items: center; gap: 10px;"><span style="width: 34px; height: 20px; border-radius: 5px; box-sizing: border-box; background: #FBEADF; border: 2px solid #B04E1C;"></span>New in this fork</span>
+<span style="display: flex; align-items: center; gap: 10px;"><span style="width: 34px; height: 20px; border-radius: 5px; box-sizing: border-box; background: #F4F1E8; border: 1.5px dashed #8A847A;"></span>Stub or absent</span>
+<span style="display: flex; align-items: center; gap: 10px;"><svg width="34" height="10" viewBox="0 0 34 10" aria-hidden="true"><path d="M0 5 L25 5" style="stroke: #B04E1C; stroke-width: 2;"></path><polygon points="34,5 24,0 24,10" style="fill: #B04E1C;"></polygon></svg>New path through the system</span>
+</div>
+<div style="margin-top: 28px; font-size: 14px; line-height: 1.6; color: #6B665E;">Source: <a href="https://github.com/amahpour/esp-webrtc-solution/tree/feature/oc-20-real-function-calls/solutions/openai_demo">amahpour/esp-webrtc-solution</a> on <code>feature/oc-20-real-function-calls</code>, compared against <a href="https://github.com/espressif/esp-webrtc-solution/tree/c57e51bccd0c25009522b8ff01a91ef2c72dfb6b/solutions/openai_demo">espressif/esp-webrtc-solution</a> at <code>c57e51b</code>. Measured on the board, 28 Aug – 1 Sep 2026.</div>
+</div>
+<div class="board" id="glance" style="width: 1440px; height: 1000px; box-sizing: border-box; padding: 64px; display: flex; flex-direction: column; background: #F4F1E8; color: #1A1917; font-family: 'IBM Plex Sans', system-ui, sans-serif;">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 920px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A;">AT A GLANCE</div>
+<h2 class="h2" style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 44px; line-height: 1.1; letter-spacing: -0.01em;">Same voice link, different ends</h2>
+<p style="margin: 0; font-size: 18px; line-height: 1.55; color: #4F4B44;">Upstream's tools only print. This fork's move real hardware inside limits the firmware sets, and the box stays offline until it's spoken to.</p>
+</div>
+<div class="glance" style="margin-top: 32px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px;">
+<div style="padding: 24px; background: #EAE5D8; border-radius: 14px; display: flex; flex-direction: column; gap: 14px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; font-weight: 500; letter-spacing: 0.14em; color: #6B665E;">BEFORE · UPSTREAM</div>
+<svg class="dg" viewBox="0 0 600 392" role="img" aria-label="Upstream at a glance" style="width: 100%; height: auto; display: block;">
+<rect class="up" x="160.0" y="0.0" width="280.0" height="58.0" rx="10"></rect>
+<text class="tl mid" x="300.0" y="35.0">OpenAI Realtime</text>
+<path class="ln" d="M300.0 65.0 L300.0 103.0"></path>
+<polygon class="ah" points="300.0,110.0 295.5,101.0 304.5,101.0"></polygon>
+<polygon class="ah" points="300.0,58.0 304.5,67.0 295.5,67.0"></polygon>
+<rect class="bbg" x="309.0" y="76.0" width="122.0" height="18.0" rx="3"></rect>
+<text class="sl g" x="314.0" y="89.0">always connected</text>
+<rect class="up" x="10.0" y="110.0" width="580.0" height="150.0" rx="12"></rect>
+<text class="tl" x="28.0" y="138.0">ESP32-S3-Korvo-2</text>
+<rect class="stub" x="25.0" y="156.0" width="170.0" height="84.0" rx="10"></rect>
+<text class="tl mid g" x="110.0" y="204.0">No wake word</text>
+<rect class="up" x="215.0" y="156.0" width="170.0" height="84.0" rx="10"></rect>
+<text class="tl mid" x="300.0" y="195.0">Voice link</text>
+<text class="sl mid" x="300.0" y="216.0">speech in and out</text>
+<rect class="stub" x="405.0" y="156.0" width="170.0" height="84.0" rx="10"></rect>
+<text class="tl mid g" x="490.0" y="204.0">Tools only print</text>
+<rect class="stub" x="25.0" y="314.0" width="170.0" height="76.0" rx="10"></rect>
+<text class="tl mid g" x="110.0" y="358.0">No screen</text>
+<rect class="up" x="215.0" y="314.0" width="170.0" height="76.0" rx="10"></rect>
+<text class="tl mid" x="300.0" y="358.0">Mic + speaker</text>
+<rect class="stub" x="405.0" y="314.0" width="170.0" height="76.0" rx="10"></rect>
+<text class="tl mid g" x="490.0" y="358.0">Nothing to drive</text>
+<path class="ln" d="M300.0 267.0 L300.0 307.0"></path>
+<polygon class="ah" points="300.0,314.0 295.5,305.0 304.5,305.0"></polygon>
+<polygon class="ah" points="300.0,260.0 304.5,269.0 295.5,269.0"></polygon>
+</svg>
+</div>
+<div style="padding: 24px; background: #EAE5D8; border-radius: 14px; display: flex; flex-direction: column; gap: 14px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A;">AFTER · THIS FORK</div>
+<svg class="dg" viewBox="0 0 600 392" role="img" aria-label="This fork at a glance" style="width: 100%; height: auto; display: block;">
+<rect class="up" x="160.0" y="0.0" width="280.0" height="58.0" rx="10"></rect>
+<text class="tl mid" x="300.0" y="35.0">OpenAI Realtime</text>
+<path class="lnc" d="M300.0 66.0 L300.0 102.0"></path>
+<polygon class="ahc" points="300.0,110.0 295.0,100.0 305.0,100.0"></polygon>
+<polygon class="ahc" points="300.0,58.0 305.0,68.0 295.0,68.0"></polygon>
+<rect class="bbg" x="309.0" y="76.0" width="150.0" height="18.0" rx="3"></rect>
+<text class="sl cu" x="314.0" y="89.0">only after “Hi, ESP”</text>
+<rect class="chg" x="10.0" y="110.0" width="580.0" height="150.0" rx="12"></rect>
+<text class="tl" x="28.0" y="138.0">ESP32-S3-BOX-3</text>
+<rect class="new" x="25.0" y="156.0" width="170.0" height="84.0" rx="10"></rect>
+<text class="tl mid" x="110.0" y="195.0">Wake word</text>
+<text class="sl mid" x="110.0" y="216.0">on the device</text>
+<rect class="up" x="215.0" y="156.0" width="170.0" height="84.0" rx="10"></rect>
+<text class="tl mid" x="300.0" y="195.0">Voice link</text>
+<text class="sl mid" x="300.0" y="216.0">speech in and out</text>
+<rect class="new" x="405.0" y="156.0" width="170.0" height="84.0" rx="10"></rect>
+<text class="tl mid" x="490.0" y="195.0">Real tools</text>
+<text class="sl mid" x="490.0" y="216.0">with limits</text>
+<rect class="new" x="25.0" y="314.0" width="170.0" height="76.0" rx="10"></rect>
+<text class="tl mid" x="110.0" y="349.0">Screen</text>
+<text class="sl mid" x="110.0" y="370.0">what it heard and did</text>
+<rect class="up" x="215.0" y="314.0" width="170.0" height="76.0" rx="10"></rect>
+<text class="tl mid" x="300.0" y="358.0">Mic + speaker</text>
+<rect class="new" x="405.0" y="314.0" width="170.0" height="76.0" rx="10"></rect>
+<text class="tl mid" x="490.0" y="349.0">Bench DACs</text>
+<text class="sl mid" x="490.0" y="370.0">0–3.2 V out</text>
+<path class="ln" d="M300.0 267.0 L300.0 307.0"></path>
+<polygon class="ah" points="300.0,314.0 295.5,305.0 304.5,305.0"></polygon>
+<polygon class="ah" points="300.0,260.0 304.5,269.0 295.5,269.0"></polygon>
+<path class="lnc" d="M110.0 260.0 L110.0 306.0"></path>
+<polygon class="ahc" points="110.0,314.0 105.0,304.0 115.0,304.0"></polygon>
+<path class="lnc" d="M490.0 260.0 L490.0 306.0"></path>
+<polygon class="ahc" points="490.0,314.0 485.0,304.0 495.0,304.0"></polygon>
+</svg>
+</div>
+</div>
+<div class="stats" style="margin-top: 32px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px;">
+<div style="padding: 18px 20px; background: #FFFDF8; border: 1px solid #D6CFBF; border-radius: 12px; display: flex; flex-direction: column; gap: 6px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A;">TOOLS</div>
+<div style="font-size: 15px; color: #6B665E; text-decoration: line-through;">print only</div>
+<div style="font-size: 20px; font-weight: 600; line-height: 1.25;">move real hardware</div>
+</div>
+<div style="padding: 18px 20px; background: #FFFDF8; border: 1px solid #D6CFBF; border-radius: 12px; display: flex; flex-direction: column; gap: 6px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A;">CONNECTION</div>
+<div style="font-size: 15px; color: #6B665E; text-decoration: line-through;">always on</div>
+<div style="font-size: 20px; font-weight: 600; line-height: 1.25;">only when spoken to</div>
+</div>
+<div style="padding: 18px 20px; background: #FFFDF8; border: 1px solid #D6CFBF; border-radius: 12px; display: flex; flex-direction: column; gap: 6px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A;">LIMITS</div>
+<div style="font-size: 15px; color: #6B665E; text-decoration: line-through;">none</div>
+<div style="font-size: 20px; font-weight: 600; line-height: 1.25;">enforced in firmware</div>
+</div>
+<div style="padding: 18px 20px; background: #FFFDF8; border: 1px solid #D6CFBF; border-radius: 12px; display: flex; flex-direction: column; gap: 6px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A;">FEEDBACK</div>
+<div style="font-size: 15px; color: #6B665E; text-decoration: line-through;">serial log</div>
+<div style="font-size: 20px; font-weight: 600; line-height: 1.25;">screen on the box</div>
+</div>
+</div>
+</div>
+<div class="board" id="before" style="width: 1440px; height: 1330px; box-sizing: border-box; padding: 64px; display: flex; flex-direction: column; background: #F4F1E8; color: #1A1917; font-family: 'IBM Plex Sans', system-ui, sans-serif;">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 920px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A;">01 · BEFORE</div>
+<h2 class="h2" style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 44px; line-height: 1.1; letter-spacing: -0.01em;">Upstream: a smart-home demo whose tools only print</h2>
+<p style="margin: 0; font-size: 18px; line-height: 1.55; color: #4F4B44;">Espressif's <code>openai_demo</code> as it ships, built for the ESP32-S3-Korvo-2. The plumbing is excellent: WebRTC to OpenAI, Opus both ways, a data channel for events and tool calls. But every tool handler is a <code>printf</code>, the session opens at boot and stays open, and the stock app does not fit the stock partition.</p>
+</div>
+<div class="dgw" style="margin-top: 36px;">
+<svg class="dg" viewBox="0 0 1312 812" role="img" aria-label="Upstream openai_demo architecture: cloud, firmware and Korvo-2 hardware" style="width: 100%; height: auto; display: block;">
+<rect class="band" x="0.0" y="0.0" width="1312.0" height="170.0" rx="16"></rect>
+<text class="bl" x="20.0" y="27.0">CLOUD · OPENAI</text>
+<rect class="band" x="0.0" y="210.0" width="1312.0" height="384.0" rx="16"></rect>
+<text class="bl" x="20.0" y="237.0">FIRMWARE · solutions/openai_demo</text>
+<rect class="band" x="0.0" y="634.0" width="1312.0" height="174.0" rx="16"></rect>
+<text class="bl" x="20.0" y="661.0">HARDWARE · ESP32-S3-KORVO-2</text>
+<rect class="up" x="20.0" y="44.0" width="224.0" height="106.0" rx="10"></rect>
+<text class="t" x="34.0" y="71.0">OpenAI REST</text>
+<text class="s m" x="34.0" y="94.0">/v1/realtime/client_secrets</text>
+<text class="s m" x="34.0" y="112.5">/v1/realtime/calls</text>
+<text class="s" x="34.0" y="131.0">token, then SDP offer/answer</text>
+<rect class="up" x="512.0" y="44.0" width="276.0" height="106.0" rx="10"></rect>
+<text class="t" x="526.0" y="71.0">OpenAI Realtime API</text>
+<text class="s" x="526.0" y="94.0">model: gpt-realtime-2</text>
+<text class="s" x="526.0" y="112.5">default turn detection</text>
+<text class="s" x="526.0" y="131.0">calls tools by name</text>
+<text class="t" x="828.0" y="76.0">Session opens at boot</text>
+<text class="s" x="828.0" y="100.0">and stays open until someone types stop.</text>
+<text class="s g" x="828.0" y="119.0">Nothing asks whether anyone is talking.</text>
+<rect class="up" x="20.0" y="254.0" width="224.0" height="150.0" rx="10"></rect>
+<text class="t" x="34.0" y="281.0">openai_signaling.c</text>
+<text class="s" x="34.0" y="304.0">POST client_secrets → token</text>
+<text class="s" x="34.0" y="322.5">POST calls → SDP answer</text>
+<text class="s g" x="34.0" y="341.0">rejection: serial log only</text>
+<rect class="up" x="266.0" y="254.0" width="224.0" height="150.0" rx="10"></rect>
+<text class="t" x="280.0" y="281.0">main.c</text>
+<text class="s" x="280.0" y="304.0">Wi-Fi up → start_webrtc()</text>
+<text class="s" x="280.0" y="322.5">session opens at boot</text>
+<text class="s" x="280.0" y="341.0">open until stop</text>
+<text class="s g" x="280.0" y="359.5">Wi-Fi drop / return: restart</text>
+<rect class="up" x="512.0" y="254.0" width="276.0" height="320.0" rx="10"></rect>
+<text class="t" x="526.0" y="281.0">webrtc.c</text>
+<rect class="sub" x="524.0" y="296.0" width="252.0" height="60.0" rx="7"></rect>
+<text class="t2" x="536.0" y="315.0">session.update</text>
+<text class="s2" x="536.0" y="333.0">instructions + 3 tools:</text>
+<text class="s2" x="536.0" y="348.5">SetLightState · volume · door</text>
+<rect class="sub" x="524.0" y="364.0" width="252.0" height="60.0" rx="7"></rect>
+<text class="t2" x="536.0" y="383.0">event router</text>
+<text class="s2" x="536.0" y="401.0">function_call → handler</text>
+<text class="s2" x="536.0" y="416.5">transcripts → serial log</text>
+<rect class="sub" x="524.0" y="432.0" width="252.0" height="60.0" rx="7"></rect>
+<text class="t2" x="536.0" y="451.0">tool reply</text>
+<text class="s2 m" x="536.0" y="469.0">{&quot;ok&quot;:true} if the name matched</text>
+<rect class="sub" x="524.0" y="500.0" width="252.0" height="60.0" rx="7"></rect>
+<text class="t2" x="536.0" y="519.0">turn taking</text>
+<text class="s2 g" x="536.0" y="537.0">server defaults, no config</text>
+<rect class="up" x="828.0" y="254.0" width="226.0" height="150.0" rx="10"></rect>
+<text class="t" x="842.0" y="281.0">media_sys.c</text>
+<text class="s" x="842.0" y="304.0">capture: esp_capture AEC src</text>
+<text class="s" x="842.0" y="322.5">render: av_render → I2S</text>
+<text class="s g" x="842.0" y="341.0">jitter threshold: 0 × … = 0</text>
+<rect class="stub" x="1076.0" y="254.0" width="216.0" height="320.0" rx="10"></rect>
+<text class="t g" x="1090.0" y="281.0">tool handlers</text>
+<text class="s m g" x="1090.0" y="304.0">set_light_on_off()</text>
+<text class="s m g" x="1090.0" y="322.5">set_light_color_red()</text>
+<text class="s m g" x="1090.0" y="341.0">set_light_color_green()</text>
+<text class="s m g" x="1090.0" y="359.5">set_light_color_blue()</text>
+<text class="s m g" x="1090.0" y="378.0">set_speaker_volume()</text>
+<text class="s m g" x="1090.0" y="396.5">set_door_state()</text>
+<text class="s bad" x="1090.0" y="433.5">each one: printf(), return</text>
+<text class="s g" x="1090.0" y="452.0">nothing moves, not even</text>
+<text class="s g" x="1090.0" y="470.5">the speaker volume</text>
+<rect class="tgstub" x="1237.2" y="245.5" width="40.8" height="17.0" rx="8.5"></rect>
+<text class="tg tgg mid" x="1257.6" y="257.5">STUB</text>
+<rect class="up" x="20.0" y="434.0" width="224.0" height="140.0" rx="10"></rect>
+<text class="t" x="34.0" y="461.0">console · UART</text>
+<text class="s m" x="34.0" y="484.0">start stop i assert</text>
+<text class="s m" x="34.0" y="502.5">wifi m text rec2play</text>
+<rect class="stub" x="266.0" y="434.0" width="224.0" height="140.0" rx="10"></rect>
+<text class="t g" x="280.0" y="461.0">no display</text>
+<text class="s g" x="280.0" y="484.0">LCD not in the loop</text>
+<text class="s g" x="280.0" y="502.5">state lives in the serial log</text>
+<rect class="up" x="828.0" y="434.0" width="182.0" height="140.0" rx="10"></rect>
+<text class="t" x="842.0" y="461.0">esp_capture</text>
+<text class="s" x="842.0" y="484.0">released component</text>
+<text class="s" x="842.0" y="502.5">AFE: AEC, WakeNet-ready</text>
+<text class="s g" x="842.0" y="521.0">wake result discarded</text>
+<rect class="up" x="20.0" y="678.0" width="224.0" height="110.0" rx="10"></rect>
+<text class="t" x="34.0" y="705.0">USB-UART bridge</text>
+<text class="s" x="34.0" y="728.0">console + flashing</text>
+<text class="s" x="34.0" y="746.5">through a serial chip</text>
+<rect class="stub" x="266.0" y="678.0" width="224.0" height="110.0" rx="10"></rect>
+<text class="t g" x="280.0" y="705.0">display</text>
+<text class="s g" x="280.0" y="728.0">not used by the demo</text>
+<rect class="up" x="512.0" y="678.0" width="276.0" height="110.0" rx="10"></rect>
+<text class="t" x="526.0" y="705.0">ESP32-S3 flash</text>
+<text class="s" x="526.0" y="728.0">declared 4 MB · factory 3 MB</text>
+<text class="s bad" x="526.0" y="746.5">the 4.1 MB app does not fit</text>
+<rect class="up" x="828.0" y="678.0" width="226.0" height="110.0" rx="10"></rect>
+<text class="t" x="842.0" y="705.0">ES7210 + ES8311</text>
+<text class="s" x="842.0" y="728.0">mic ADC, 4-slot TDM</text>
+<text class="s" x="842.0" y="746.5">AEC ref per Korvo-2 wiring</text>
+<text class="s" x="842.0" y="765.0">ES8311 → speaker</text>
+<rect class="stub" x="1076.0" y="678.0" width="216.0" height="110.0" rx="10"></rect>
+<text class="t g" x="1090.0" y="705.0">peripherals</text>
+<text class="s g" x="1090.0" y="728.0">nothing to drive</text>
+<path class="ln" d="M132.0 157.0 L132.0 247.0"></path>
+<polygon class="ah" points="132.0,254.0 127.5,245.0 136.5,245.0"></polygon>
+<polygon class="ah" points="132.0,150.0 136.5,159.0 127.5,159.0"></polygon>
+<rect class="pbg" x="137.0" y="183.0" width="42.2" height="18.0" rx="3"></rect>
+<text class="s" x="142.0" y="196.0">HTTPS</text>
+<path class="ln" d="M604.0 157.0 L604.0 247.0"></path>
+<polygon class="ah" points="604.0,254.0 599.5,245.0 608.5,245.0"></polygon>
+<polygon class="ah" points="604.0,150.0 608.5,159.0 599.5,159.0"></polygon>
+<rect class="pbg" x="524.5" y="183.0" width="74.5" height="18.0" rx="3"></rect>
+<text class="s end" x="594.0" y="196.0">Opus audio</text>
+<path class="ln" d="M696.0 157.0 L696.0 247.0"></path>
+<polygon class="ah" points="696.0,254.0 691.5,245.0 700.5,245.0"></polygon>
+<polygon class="ah" points="696.0,150.0 700.5,159.0 691.5,159.0"></polygon>
+<rect class="pbg" x="701.0" y="183.0" width="87.4" height="18.0" rx="3"></rect>
+<text class="s" x="706.0" y="196.0">data channel</text>
+<path class="ln" d="M490.0 330.0 L505.0 330.0"></path>
+<polygon class="ah" points="512.0,330.0 503.0,334.5 503.0,325.5"></polygon>
+<path class="ln" d="M795.0 330.0 L821.0 330.0"></path>
+<polygon class="ah" points="828.0,330.0 819.0,334.5 819.0,325.5"></polygon>
+<polygon class="ah" points="788.0,330.0 797.0,325.5 797.0,334.5"></polygon>
+<path class="lng" d="M795.0 272.0 L808.0 272.0 L808.0 232.0 L1184.0 232.0 L1184.0 247.0"></path>
+<polygon class="ahg" points="1184.0,254.0 1179.5,245.0 1188.5,245.0"></polygon>
+<polygon class="ahg" points="788.0,272.0 797.0,267.5 797.0,276.5"></polygon>
+<rect class="bbg" x="928.9" y="223.0" width="134.2" height="18.0" rx="3"></rect>
+<text class="s m mid" x="996.0" y="236.0">call ⇄ {&quot;ok&quot;:true}</text>
+<path class="ln" d="M870.0 678.0 L870.0 581.0"></path>
+<polygon class="ah" points="870.0,574.0 874.5,583.0 865.5,583.0"></polygon>
+<rect class="pbg" x="875.0" y="605.0" width="113.2" height="18.0" rx="3"></rect>
+<text class="s" x="880.0" y="618.0">mics + ref · TDM</text>
+<path class="ln" d="M870.0 434.0 L870.0 411.0"></path>
+<polygon class="ah" points="870.0,404.0 874.5,413.0 865.5,413.0"></polygon>
+<path class="ln" d="M1032.0 404.0 L1032.0 671.0"></path>
+<polygon class="ah" points="1032.0,678.0 1027.5,669.0 1036.5,669.0"></polygon>
+<rect class="pbg" x="1037.0" y="605.0" width="81.0" height="18.0" rx="3"></rect>
+<text class="s" x="1042.0" y="618.0">speaker PCM</text>
+<path class="ln" d="M132.0 581.0 L132.0 671.0"></path>
+<polygon class="ah" points="132.0,678.0 127.5,669.0 136.5,669.0"></polygon>
+<polygon class="ah" points="132.0,574.0 136.5,583.0 127.5,583.0"></polygon>
+<rect class="pbg" x="137.0" y="605.0" width="48.7" height="18.0" rx="3"></rect>
+<text class="s" x="142.0" y="618.0">serial</text>
+</svg>
+</div>
+<div style="margin-top: 20px; display: flex; flex-wrap: wrap; gap: 10px;"><span style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12.5px; padding: 6px 10px; border: 1px solid #D6CFBF; border-radius: 6px; background: #FFFDF8; color: #4F4B44;">ESP-IDF v5.4 / master</span><span style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12.5px; padding: 6px 10px; border: 1px solid #D6CFBF; border-radius: 6px; background: #FFFDF8; color: #4F4B44;">4 MB flash declared</span><span style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12.5px; padding: 6px 10px; border: 1px solid #D6CFBF; border-radius: 6px; background: #FFFDF8; color: #4F4B44;">factory 3 MB</span><span style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12.5px; padding: 6px 10px; border: 1px solid #D6CFBF; border-radius: 6px; background: #FFFDF8; color: #4F4B44;">console over USB-UART</span><span style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12.5px; padding: 6px 10px; border: 1px solid #D6CFBF; border-radius: 6px; background: #FFFDF8; color: #4F4B44;">gpt-realtime-2</span></div>
+</div>
+<div class="board" id="after" style="width: 1440px; height: 1530px; box-sizing: border-box; padding: 64px; display: flex; flex-direction: column; background: #F4F1E8; color: #1A1917; font-family: 'IBM Plex Sans', system-ui, sans-serif;">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 920px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A;">02 · AFTER</div>
+<h2 class="h2" style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 44px; line-height: 1.1; letter-spacing: -0.01em;">This fork: a bench lab assistant on the ESP32-S3-BOX-3</h2>
+<p style="margin: 0; font-size: 18px; line-height: 1.55; color: #4F4B44;">Same WebRTC spine, new ends. The tools drive a pair of DAC7578s on the dock's I2C bus behind firmware clamps, a wake word keeps the box off the network until it is spoken to, the mic closes while the box talks, and the screen shows what happened. Copper marks everything this fork added or changed.</p>
+</div>
+<div class="dgw" style="margin-top: 36px;">
+<svg class="dg" viewBox="0 0 1312 1012" role="img" aria-label="This fork&#x27;s architecture: cloud, firmware, BOX-3 hardware and the bench DACs" style="width: 100%; height: auto; display: block;">
+<rect class="band" x="0.0" y="0.0" width="1312.0" height="170.0" rx="16"></rect>
+<text class="bl" x="20.0" y="27.0">CLOUD · OPENAI</text>
+<rect class="band" x="0.0" y="210.0" width="1312.0" height="384.0" rx="16"></rect>
+<text class="bl" x="20.0" y="237.0">FIRMWARE · solutions/openai_demo (this fork)</text>
+<rect class="band" x="0.0" y="634.0" width="1312.0" height="174.0" rx="16"></rect>
+<text class="bl" x="20.0" y="661.0">HARDWARE · ESP32-S3-BOX-3</text>
+<rect class="band" x="812.0" y="848.0" width="500.0" height="160.0" rx="16"></rect>
+<text class="bl" x="832.0" y="875.0">BENCH</text>
+<rect class="up" x="20.0" y="44.0" width="224.0" height="106.0" rx="10"></rect>
+<text class="t" x="34.0" y="71.0">OpenAI REST</text>
+<text class="s m" x="34.0" y="94.0">/v1/realtime/client_secrets</text>
+<text class="s m" x="34.0" y="112.5">/v1/realtime/calls</text>
+<text class="s" x="34.0" y="131.0">token, then SDP offer/answer</text>
+<rect class="chg" x="512.0" y="44.0" width="276.0" height="106.0" rx="10"></rect>
+<text class="t" x="526.0" y="71.0">OpenAI Realtime API</text>
+<text class="s cu" x="526.0" y="94.0">model: gpt-realtime-mini</text>
+<text class="s cu" x="526.0" y="112.5">server_vad · barge-in · near-field</text>
+<text class="s cu" x="526.0" y="131.0">+ uplink transcription</text>
+<rect class="tgchg" x="713.1" y="35.5" width="60.9" height="17.0" rx="8.5"></rect>
+<text class="tg mid" x="743.6" y="47.5">CHANGED</text>
+<text class="t cu" x="828.0" y="76.0">Idle means no connection.</text>
+<text class="s" x="828.0" y="100.0">WakeNet listens on the S3 and drops every frame;</text>
+<text class="s" x="828.0" y="119.0">nothing reaches OpenAI until someone says “Hi, ESP”.</text>
+<rect class="chg" x="20.0" y="254.0" width="224.0" height="150.0" rx="10"></rect>
+<text class="t" x="34.0" y="281.0">openai_signaling.c</text>
+<text class="s" x="34.0" y="304.0">POST client_secrets → token</text>
+<text class="s" x="34.0" y="322.5">POST calls → SDP answer</text>
+<text class="s cu" x="34.0" y="341.0">rejection reason → screen</text>
+<rect class="tgchg" x="169.1" y="245.5" width="60.9" height="17.0" rx="8.5"></rect>
+<text class="tg mid" x="199.5" y="257.5">CHANGED</text>
+<rect class="chg" x="266.0" y="254.0" width="224.0" height="150.0" rx="10"></rect>
+<text class="t" x="280.0" y="281.0">main.c</text>
+<text class="s cu" x="280.0" y="304.0">idle: listen for “Hi, ESP”</text>
+<text class="s cu" x="280.0" y="322.5">wake / start → session</text>
+<text class="s cu" x="280.0" y="341.0">120 s silence → close</text>
+<text class="s cu" x="280.0" y="359.5">no auto-start or reconnect</text>
+<rect class="tgchg" x="415.1" y="245.5" width="60.9" height="17.0" rx="8.5"></rect>
+<text class="tg mid" x="445.6" y="257.5">CHANGED</text>
+<rect class="chg" x="512.0" y="254.0" width="276.0" height="320.0" rx="10"></rect>
+<text class="t" x="526.0" y="281.0">webrtc.c</text>
+<rect class="tgchg" x="713.1" y="245.5" width="60.9" height="17.0" rx="8.5"></rect>
+<text class="tg mid" x="743.6" y="257.5">CHANGED</text>
+<rect class="sub" x="524.0" y="296.0" width="252.0" height="60.0" rx="7"></rect>
+<text class="t2" x="536.0" y="315.0">session.update</text>
+<text class="s2" x="536.0" y="333.0">3 bench tools + instructions</text>
+<text class="s2 cu" x="536.0" y="348.5">server_vad 600/700 ms, barge-in</text>
+<rect class="sub" x="524.0" y="364.0" width="252.0" height="60.0" rx="7"></rect>
+<text class="t2" x="536.0" y="383.0">event router</text>
+<text class="s2 cu" x="536.0" y="401.0">transcripts, errors → screen</text>
+<text class="s2" x="536.0" y="416.5">tool calls → executor</text>
+<rect class="subn" x="524.0" y="432.0" width="252.0" height="60.0" rx="7"></rect>
+<text class="t2" x="536.0" y="451.0">mic gate · half duplex</text>
+<text class="s2" x="536.0" y="469.0">mute: output_audio_buffer.started</text>
+<text class="s2" x="536.0" y="484.5">open: .stopped + 300 ms</text>
+<rect class="subn" x="524.0" y="500.0" width="252.0" height="60.0" rx="7"></rect>
+<text class="t2" x="536.0" y="519.0">tool executor</text>
+<text class="s2" x="536.0" y="537.0">&quot;3&quot; and 3 both parse</text>
+<text class="s2" x="536.0" y="552.5">real result or error → model</text>
+<rect class="chg" x="828.0" y="254.0" width="226.0" height="150.0" rx="10"></rect>
+<text class="t" x="842.0" y="281.0">media_sys.c</text>
+<text class="s cu" x="842.0" y="304.0">AEC ref = slot 1 (measured)</text>
+<text class="s cu" x="842.0" y="322.5">mic gain 36 dB, mics only</text>
+<text class="s cu" x="842.0" y="341.0">idle sink drops every frame</text>
+<text class="s" x="842.0" y="359.5">jitter 0, kept on purpose</text>
+<rect class="tgchg" x="979.1" y="245.5" width="60.9" height="17.0" rx="8.5"></rect>
+<text class="tg mid" x="1009.6" y="257.5">CHANGED</text>
+<rect class="new" x="1076.0" y="254.0" width="216.0" height="150.0" rx="10"></rect>
+<text class="t" x="1090.0" y="281.0">tools the model sees</text>
+<text class="s m" x="1090.0" y="304.0">set_channel_voltage</text>
+<text class="s m" x="1090.0" y="322.5">get_channel_voltage</text>
+<text class="s m" x="1090.0" y="341.0">set_speaker_volume</text>
+<text class="s" x="1090.0" y="359.5">ch 0–15 · 0–3200 mV · 0–100</text>
+<rect class="tgnew" x="1243.9" y="245.5" width="34.1" height="17.0" rx="8.5"></rect>
+<text class="tg tgw mid" x="1261.0" y="257.5">NEW</text>
+<rect class="chg" x="20.0" y="434.0" width="224.0" height="140.0" rx="10"></rect>
+<text class="t" x="34.0" y="461.0">console · USB-JTAG</text>
+<text class="s m" x="34.0" y="484.0">start stop i text wifi m</text>
+<text class="s m cu" x="34.0" y="502.5">wake micscan trace vad</text>
+<text class="s m cu" x="34.0" y="521.0">vol model net vref dac</text>
+<rect class="tgchg" x="169.1" y="425.5" width="60.9" height="17.0" rx="8.5"></rect>
+<text class="tg mid" x="199.5" y="437.5">CHANGED</text>
+<rect class="new" x="266.0" y="434.0" width="224.0" height="140.0" rx="10"></rect>
+<text class="t" x="280.0" y="461.0">display.c</text>
+<text class="s" x="280.0" y="484.0">esp_lcd + LVGL 9, no BSP</text>
+<text class="s" x="280.0" y="502.5">status · transcript</text>
+<text class="s" x="280.0" y="521.0">tool result: green / red</text>
+<rect class="tgnew" x="441.9" y="425.5" width="34.1" height="17.0" rx="8.5"></rect>
+<text class="tg tgw mid" x="458.9" y="437.5">NEW</text>
+<rect class="chg" x="828.0" y="434.0" width="182.0" height="140.0" rx="10"></rect>
+<text class="t" x="842.0" y="461.0">esp_capture</text>
+<text class="s" x="842.0" y="484.0">vendored, 2 edits</text>
+<text class="s cu" x="842.0" y="502.5">WakeNet → wake_cb</text>
+<text class="s cu" x="842.0" y="521.0">“Hi, ESP” → main.c</text>
+<rect class="tgchg" x="928.4" y="425.5" width="67.6" height="17.0" rx="8.5"></rect>
+<text class="tg mid" x="962.2" y="437.5">VENDORED</text>
+<rect class="new" x="1076.0" y="434.0" width="216.0" height="140.0" rx="10"></rect>
+<text class="t" x="1090.0" y="461.0">bench_dac.c</text>
+<text class="s" x="1090.0" y="484.0">clamp: refuse, never clip</text>
+<text class="s" x="1090.0" y="502.5">vref settable at runtime</text>
+<text class="s" x="1090.0" y="521.0">3-byte write, updates now</text>
+<rect class="tgnew" x="1243.9" y="425.5" width="34.1" height="17.0" rx="8.5"></rect>
+<text class="tg tgw mid" x="1261.0" y="437.5">NEW</text>
+<rect class="chg" x="20.0" y="678.0" width="224.0" height="110.0" rx="10"></rect>
+<text class="t" x="34.0" y="705.0">USB-Serial-JTAG</text>
+<text class="s cu" x="34.0" y="728.0">BOX-3 has no UART bridge</text>
+<text class="s" x="34.0" y="746.5">console + flash over USB</text>
+<rect class="tgchg" x="169.1" y="669.5" width="60.9" height="17.0" rx="8.5"></rect>
+<text class="tg mid" x="199.5" y="681.5">CHANGED</text>
+<rect class="new" x="266.0" y="678.0" width="224.0" height="110.0" rx="10"></rect>
+<text class="t" x="280.0" y="705.0">LCD</text>
+<text class="s" x="280.0" y="728.0">320×240 · SPI3</text>
+<text class="s" x="280.0" y="746.5">status you can film</text>
+<rect class="tgnew" x="441.9" y="669.5" width="34.1" height="17.0" rx="8.5"></rect>
+<text class="tg tgw mid" x="458.9" y="681.5">NEW</text>
+<rect class="chg" x="512.0" y="678.0" width="276.0" height="110.0" rx="10"></rect>
+<text class="t" x="526.0" y="705.0">ESP32-S3 flash · N16R16</text>
+<text class="s cu" x="526.0" y="728.0">16 MB (was 4) · factory 6 MB (was 3)</text>
+<text class="s cu" x="526.0" y="746.5">model 4 MB: WakeNet image</text>
+<rect class="tgchg" x="713.1" y="669.5" width="60.9" height="17.0" rx="8.5"></rect>
+<text class="tg mid" x="743.6" y="681.5">CHANGED</text>
+<rect class="chg" x="828.0" y="678.0" width="226.0" height="110.0" rx="10"></rect>
+<text class="t" x="842.0" y="705.0">ES7210 + ES8311</text>
+<text class="s" x="842.0" y="728.0">mic ADC, 4-slot TDM</text>
+<text class="s cu" x="842.0" y="746.5">slots 0, 2 mics · slot 1 ref</text>
+<text class="s" x="842.0" y="765.0">ES8311 → speaker</text>
+<rect class="new" x="1076.0" y="678.0" width="216.0" height="110.0" rx="10"></rect>
+<text class="t" x="1090.0" y="705.0">dock I2C · port 1</text>
+<text class="s" x="1090.0" y="728.0">SCL GPIO40 · SDA GPIO41</text>
+<text class="s" x="1090.0" y="746.5">apart from codec bus 8/18</text>
+<rect class="tgnew" x="1243.9" y="669.5" width="34.1" height="17.0" rx="8.5"></rect>
+<text class="tg tgw mid" x="1261.0" y="681.5">NEW</text>
+<rect class="new" x="828.0" y="892.0" width="226.0" height="96.0" rx="10"></rect>
+<text class="t" x="842.0" y="919.0">scope</text>
+<text class="s" x="842.0" y="942.0">1800 mV commanded</text>
+<text class="s cu" x="842.0" y="960.5">1.801 V measured</text>
+<rect class="tgnew" x="1005.9" y="883.5" width="34.1" height="17.0" rx="8.5"></rect>
+<text class="tg tgw mid" x="1022.9" y="895.5">NEW</text>
+<rect class="new" x="1076.0" y="892.0" width="216.0" height="96.0" rx="10"></rect>
+<text class="t" x="1090.0" y="919.0">2 × DAC7578</text>
+<text class="s" x="1090.0" y="942.0">A @0x4C · ch 0–7</text>
+<text class="s" x="1090.0" y="960.5">B @0x48 · ch 8–15 (if fitted)</text>
+<rect class="tgnew" x="1243.9" y="883.5" width="34.1" height="17.0" rx="8.5"></rect>
+<text class="tg tgw mid" x="1261.0" y="895.5">NEW</text>
+<path class="ln" d="M132.0 157.0 L132.0 247.0"></path>
+<polygon class="ah" points="132.0,254.0 127.5,245.0 136.5,245.0"></polygon>
+<polygon class="ah" points="132.0,150.0 136.5,159.0 127.5,159.0"></polygon>
+<rect class="pbg" x="137.0" y="183.0" width="42.2" height="18.0" rx="3"></rect>
+<text class="s" x="142.0" y="196.0">HTTPS</text>
+<path class="ln" d="M604.0 157.0 L604.0 247.0"></path>
+<polygon class="ah" points="604.0,254.0 599.5,245.0 608.5,245.0"></polygon>
+<polygon class="ah" points="604.0,150.0 608.5,159.0 599.5,159.0"></polygon>
+<rect class="pbg" x="524.5" y="183.0" width="74.5" height="18.0" rx="3"></rect>
+<text class="s end" x="594.0" y="196.0">Opus audio</text>
+<path class="ln" d="M696.0 157.0 L696.0 247.0"></path>
+<polygon class="ah" points="696.0,254.0 691.5,245.0 700.5,245.0"></polygon>
+<polygon class="ah" points="696.0,150.0 700.5,159.0 691.5,159.0"></polygon>
+<rect class="pbg" x="701.0" y="183.0" width="87.4" height="18.0" rx="3"></rect>
+<text class="s" x="706.0" y="196.0">data channel</text>
+<path class="ln" d="M490.0 330.0 L505.0 330.0"></path>
+<polygon class="ah" points="512.0,330.0 503.0,334.5 503.0,325.5"></polygon>
+<path class="ln" d="M795.0 330.0 L821.0 330.0"></path>
+<polygon class="ah" points="828.0,330.0 819.0,334.5 819.0,325.5"></polygon>
+<polygon class="ah" points="788.0,330.0 797.0,325.5 797.0,334.5"></polygon>
+<path class="lnc" d="M796.0 272.0 L808.0 272.0 L808.0 232.0 L1184.0 232.0 L1184.0 246.0"></path>
+<polygon class="ahc" points="1184.0,254.0 1179.0,244.0 1189.0,244.0"></polygon>
+<polygon class="ahc" points="788.0,272.0 798.0,267.0 798.0,277.0"></polygon>
+<rect class="bbg" x="928.9" y="223.0" width="134.2" height="18.0" rx="3"></rect>
+<text class="s m mid" x="996.0" y="236.0">call ⇄ result JSON</text>
+<path class="ln" d="M870.0 678.0 L870.0 581.0"></path>
+<polygon class="ah" points="870.0,574.0 874.5,583.0 865.5,583.0"></polygon>
+<rect class="pbg" x="875.0" y="605.0" width="113.2" height="18.0" rx="3"></rect>
+<text class="s" x="880.0" y="618.0">mics + ref · TDM</text>
+<path class="ln" d="M870.0 434.0 L870.0 411.0"></path>
+<polygon class="ah" points="870.0,404.0 874.5,413.0 865.5,413.0"></polygon>
+<path class="ln" d="M1032.0 404.0 L1032.0 671.0"></path>
+<polygon class="ah" points="1032.0,678.0 1027.5,669.0 1036.5,669.0"></polygon>
+<rect class="pbg" x="1037.0" y="605.0" width="81.0" height="18.0" rx="3"></rect>
+<text class="s" x="1042.0" y="618.0">speaker PCM</text>
+<path class="ln" d="M132.0 581.0 L132.0 671.0"></path>
+<polygon class="ah" points="132.0,678.0 127.5,669.0 136.5,669.0"></polygon>
+<polygon class="ah" points="132.0,574.0 136.5,583.0 127.5,583.0"></polygon>
+<rect class="pbg" x="137.0" y="605.0" width="48.7" height="18.0" rx="3"></rect>
+<text class="s" x="142.0" y="618.0">serial</text>
+<path class="lnc" d="M378.0 574.0 L378.0 670.0"></path>
+<polygon class="ahc" points="378.0,678.0 373.0,668.0 383.0,668.0"></polygon>
+<rect class="pbg" x="383.0" y="605.0" width="35.8" height="18.0" rx="3"></rect>
+<text class="s" x="388.0" y="618.0">SPI3</text>
+<path class="lnc" d="M1184.0 404.0 L1184.0 426.0"></path>
+<polygon class="ahc" points="1184.0,434.0 1179.0,424.0 1189.0,424.0"></polygon>
+<path class="lnc" d="M1184.0 574.0 L1184.0 670.0"></path>
+<polygon class="ahc" points="1184.0,678.0 1179.0,668.0 1189.0,668.0"></polygon>
+<rect class="pbg" x="1189.0" y="605.0" width="29.4" height="18.0" rx="3"></rect>
+<text class="s" x="1194.0" y="618.0">I2C</text>
+<path class="lnc" d="M1184.0 788.0 L1184.0 884.0"></path>
+<polygon class="ahc" points="1184.0,892.0 1179.0,882.0 1189.0,882.0"></polygon>
+<rect class="pbg" x="1189.0" y="817.0" width="85.9" height="18.0" rx="3"></rect>
+<text class="s m" x="1194.0" y="830.0">0x4C / 0x48</text>
+<path class="lnc" d="M1076.0 940.0 L1062.0 940.0"></path>
+<polygon class="ahc" points="1054.0,940.0 1064.0,935.0 1064.0,945.0"></polygon>
+<path class="lnc" d="M848.0 574.0 L848.0 586.0 L501.0 586.0 L501.0 419.0 L440.0 419.0 L440.0 412.0"></path>
+<polygon class="ahc" points="440.0,404.0 445.0,414.0 435.0,414.0"></polygon>
+<rect class="bbg" x="646.0" y="577.0" width="68.1" height="18.0" rx="3"></rect>
+<text class="s cu mid" x="680.0" y="590.0">wake word</text>
+</svg>
+</div>
+<div style="margin-top: 20px; display: flex; flex-wrap: wrap; gap: 10px;"><span style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12.5px; padding: 6px 10px; border: 1px solid #D6CFBF; border-radius: 6px; background: #FFFDF8; color: #4F4B44;">ESP-IDF v5.5.5</span><span style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12.5px; padding: 6px 10px; border: 1px solid #D6CFBF; border-radius: 6px; background: #FFFDF8; color: #4F4B44;">16 MB flash · factory 6 MB · model 4 MB</span><span style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12.5px; padding: 6px 10px; border: 1px solid #D6CFBF; border-radius: 6px; background: #FFFDF8; color: #4F4B44;">console over USB-Serial-JTAG</span><span style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12.5px; padding: 6px 10px; border: 1px solid #D6CFBF; border-radius: 6px; background: #FFFDF8; color: #4F4B44;">gpt-realtime-mini</span></div>
+</div>
+<div class="board" id="toolcall" style="width: 1440px; height: 1620px; box-sizing: border-box; padding: 64px; display: flex; flex-direction: column; background: #F4F1E8; color: #1A1917; font-family: 'IBM Plex Sans', system-ui, sans-serif;">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 920px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A;">03 · ONE REQUEST, END TO END</div>
+<h2 class="h2" style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 44px; line-height: 1.1; letter-spacing: -0.01em;">How a sentence becomes a voltage</h2>
+<p style="margin: 0; font-size: 18px; line-height: 1.55; color: #4F4B44;">The model decides what to do; the firmware decides what's allowed. The model sometimes sends the channel as the string <code>"3"</code>, the clamp runs before any I2C traffic, and only the real outcome goes back to the model.</p>
+</div>
+<div class="dgw" style="margin-top: 36px;">
+<svg class="dg" viewBox="0 0 1312 1040" role="img" aria-label="Sequence of one voice request: speech to tool call to DAC voltage and back" style="width: 100%; height: auto; display: block;">
+<path class="life" d="M70 56 L70 1034"></path>
+<path class="life" d="M240 56 L240 1034"></path>
+<path class="life" d="M440 56 L440 1034"></path>
+<path class="life" d="M720 56 L720 1034"></path>
+<path class="life" d="M930 56 L930 1034"></path>
+<path class="life" d="M1100 56 L1100 1034"></path>
+<path class="life" d="M1250 56 L1250 1034"></path>
+<rect class="up" x="10.0" y="0.0" width="120.0" height="56.0" rx="10"></rect>
+<text class="t mid" x="70.0" y="24.0">You</text>
+<text class="s2 g mid" x="70.0" y="43.0">at the bench</text>
+<rect class="up" x="160.0" y="0.0" width="160.0" height="56.0" rx="10"></rect>
+<text class="t mid" x="240.0" y="24.0">BOX-3 audio</text>
+<text class="s2 g mid" x="240.0" y="43.0">ES7210 · ES8311</text>
+<rect class="chg" x="360.0" y="0.0" width="160.0" height="56.0" rx="10"></rect>
+<text class="t mid" x="440.0" y="24.0">webrtc.c</text>
+<text class="s2 g mid" x="440.0" y="43.0">router · executor</text>
+<rect class="up" x="635.0" y="0.0" width="170.0" height="56.0" rx="10"></rect>
+<text class="t mid" x="720.0" y="24.0">OpenAI Realtime</text>
+<text class="s2 g mid" x="720.0" y="43.0">gpt-realtime-mini</text>
+<rect class="new" x="850.0" y="0.0" width="160.0" height="56.0" rx="10"></rect>
+<text class="t mid" x="930.0" y="24.0">bench_dac.c</text>
+<text class="s2 g mid" x="930.0" y="43.0">clamps · I2C</text>
+<rect class="new" x="1025.0" y="0.0" width="150.0" height="56.0" rx="10"></rect>
+<text class="t mid" x="1100.0" y="24.0">DAC7578</text>
+<text class="s2 g mid" x="1100.0" y="43.0">0x4C · channel 3</text>
+<rect class="new" x="1195.0" y="0.0" width="110.0" height="56.0" rx="10"></rect>
+<text class="t mid" x="1250.0" y="24.0">Scope</text>
+<text class="s2 g mid" x="1250.0" y="43.0">on channel 3</text>
+<path class="ln" d="M70.0 100.0 L233.0 100.0"></path>
+<polygon class="ah" points="240.0,100.0 231.0,104.5 231.0,95.5"></polygon>
+<rect class="pbg" x="59.7" y="79.0" width="190.6" height="18.0" rx="3"></rect>
+<text class="s mid" x="155.0" y="92.0">“Channel three to 1.8 volts”</text>
+<path class="ln" d="M240.0 150.0 L433.0 150.0"></path>
+<polygon class="ah" points="440.0,150.0 431.0,154.5 431.0,145.5"></polygon>
+<rect class="pbg" x="273.7" y="129.0" width="132.6" height="18.0" rx="3"></rect>
+<text class="s mid" x="340.0" y="142.0">PCM, echo-cancelled</text>
+<path class="ln" d="M440.0 200.0 L713.0 200.0"></path>
+<polygon class="ah" points="720.0,200.0 711.0,204.5 711.0,195.5"></polygon>
+<rect class="pbg" x="523.4" y="179.0" width="113.2" height="18.0" rx="3"></rect>
+<text class="s mid" x="580.0" y="192.0">Opus over WebRTC</text>
+<rect class="sub" x="595.0" y="222.0" width="250.0" height="47.0" rx="7"></rect>
+<text class="s2 mid" x="720.0" y="241.0">server_vad: 700 ms of silence</text>
+<text class="s2 mid" x="720.0" y="256.5">ends the turn</text>
+<path class="ln" d="M720.0 330.0 L447.0 330.0"></path>
+<polygon class="ah" points="440.0,330.0 449.0,325.5 449.0,334.5"></polygon>
+<rect class="pbg" x="461.1" y="309.0" width="237.7" height="18.0" rx="3"></rect>
+<text class="s m cu mid" x="580.0" y="322.0">{&quot;channel&quot;:&quot;3&quot;,&quot;millivolts&quot;:1800}</text>
+<rect class="pbg" x="478.4" y="290.0" width="203.2" height="18.0" rx="3"></rect>
+<text class="s m mid" x="580.0" y="303.0">function_call_arguments.done</text>
+<rect class="subn" x="290.0" y="352.0" width="300.0" height="47.0" rx="7"></rect>
+<text class="s2 mid" x="440.0" y="371.0">&quot;3&quot; → 3: strings and numbers both parse</text>
+<text class="s2 g mid" x="440.0" y="386.5">upstream kept the old value → channel 0</text>
+<path class="lnc" d="M440.0 456.0 L922.0 456.0"></path>
+<polygon class="ahc" points="930.0,456.0 920.0,461.0 920.0,451.0"></polygon>
+<rect class="pbg" x="593.8" y="435.0" width="182.5" height="18.0" rx="3"></rect>
+<text class="s m mid" x="685.0" y="448.0">bench_dac_set_mv(3, 1800)</text>
+<rect class="subn" x="842.0" y="478.0" width="176.0" height="47.0" rx="7"></rect>
+<text class="s2 mid" x="930.0" y="497.0">clamp first: ch ≤ 15,</text>
+<text class="s2 mid" x="930.0" y="512.5">mV ≤ 3200 → pass</text>
+<path class="lnc" d="M930.0 566.0 L1092.0 566.0"></path>
+<polygon class="ahc" points="1100.0,566.0 1090.0,571.0 1090.0,561.0"></polygon>
+<rect class="pbg" x="951.4" y="545.0" width="127.3" height="18.0" rx="3"></rect>
+<text class="s m mid" x="1015.0" y="558.0">I2C: 33 · hi · lo</text>
+<path class="lnc" d="M1100.0 614.0 L1242.0 614.0"></path>
+<polygon class="ahc" points="1250.0,614.0 1240.0,619.0 1240.0,609.0"></polygon>
+<rect class="pbg" x="1145.8" y="593.0" width="58.3" height="18.0" rx="3"></rect>
+<text class="s m cu mid" x="1175.0" y="606.0">1.801 V</text>
+<path class="lnd" d="M930.0 662.0 L447.0 662.0"></path>
+<polygon class="ah" points="440.0,662.0 449.0,657.5 449.0,666.5"></polygon>
+<rect class="pbg" x="659.3" y="641.0" width="51.4" height="18.0" rx="3"></rect>
+<text class="s m mid" x="685.0" y="654.0">ESP_OK</text>
+<rect class="sub" x="325.0" y="684.0" width="230.0" height="47.0" rx="7"></rect>
+<text class="s2 ok mid" x="440.0" y="703.0">screen: set_channel_voltage</text>
+<text class="s2 ok mid" x="440.0" y="718.5">ch 3, 1800 mV · OK</text>
+<path class="ln" d="M440.0 800.0 L713.0 800.0"></path>
+<polygon class="ah" points="720.0,800.0 711.0,804.5 711.0,795.5"></polygon>
+<rect class="pbg" x="433.5" y="779.0" width="292.9" height="18.0" rx="3"></rect>
+<text class="s m cu mid" x="580.0" y="792.0">{&quot;ok&quot;:true,&quot;channel&quot;:3,&quot;millivolts&quot;:1800}</text>
+<rect class="pbg" x="443.9" y="760.0" width="272.2" height="18.0" rx="3"></rect>
+<text class="s m mid" x="580.0" y="773.0">function_call_output + response.create</text>
+<path class="ln" d="M720.0 856.0 L447.0 856.0"></path>
+<polygon class="ah" points="440.0,856.0 449.0,851.5 449.0,860.5"></polygon>
+<rect class="pbg" x="452.4" y="835.0" width="255.1" height="18.0" rx="3"></rect>
+<text class="s mid" x="580.0" y="848.0">Opus: “Channel three is at 1.8 volts.”</text>
+<rect class="subn" x="300.0" y="878.0" width="280.0" height="47.0" rx="7"></rect>
+<text class="s2 mid" x="440.0" y="897.0">mic muted until</text>
+<text class="s2 mid" x="440.0" y="912.5">output_audio_buffer.stopped + 300 ms</text>
+<path class="ln" d="M440.0 966.0 L247.0 966.0"></path>
+<polygon class="ah" points="240.0,966.0 249.0,961.5 249.0,970.5"></polygon>
+<rect class="pbg" x="293.1" y="945.0" width="93.9" height="18.0" rx="3"></rect>
+<text class="s mid" x="340.0" y="958.0">PCM → speaker</text>
+<path class="ln" d="M240.0 1012.0 L77.0 1012.0"></path>
+<polygon class="ah" points="70.0,1012.0 79.0,1007.5 79.0,1016.5"></polygon>
+<rect class="pbg" x="111.3" y="991.0" width="87.4" height="18.0" rx="3"></rect>
+<text class="s mid" x="155.0" y="1004.0">spoken reply</text>
+</svg>
+</div>
+<div class="split" style="margin-top: 28px; display: flex; gap: 32px; align-items: flex-start; padding: 24px 28px; background: #FFFDF8; border: 2px solid #A3302A; border-radius: 12px;">
+<div style="flex: 1 1 0; display: flex; flex-direction: column; gap: 8px;">
+<div style="font-size: 17px; font-weight: 600;">Out of bounds: “Set channel three to five volts”</div>
+<div style="font-size: 15px; line-height: 1.55; color: #4F4B44;">The clamp refuses before any I2C traffic. The model gets the reason, the screen shows it in red, and the reply says it can't. Nothing is clipped to a nearby value and nothing is written.</div>
+</div>
+<pre style="flex: 1 1 0; margin: 0; padding: 14px 16px; background: #F4F1E8; border-radius: 8px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; line-height: 1.6; color: #A3302A; white-space: pre-wrap; word-break: break-word;">{"ok":false,
+ "error":"refused by firmware clamp: channel must be 0-15 and millivolts 0-3200"}</pre>
+</div>
+</div>
+<div class="board" id="lifecycle" style="width: 1440px; height: 1020px; box-sizing: border-box; padding: 64px; display: flex; flex-direction: column; background: #F4F1E8; color: #1A1917; font-family: 'IBM Plex Sans', system-ui, sans-serif;">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 920px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A;">04 · SESSION LIFECYCLE</div>
+<h2 class="h2" style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 44px; line-height: 1.1; letter-spacing: -0.01em;">Offline until spoken to, closed when idle</h2>
+<p style="margin: 0; font-size: 18px; line-height: 1.55; color: #4F4B44;">A realtime session costs money for as long as it is open. Upstream opens one the moment Wi-Fi comes up and keeps it until someone types <code>stop</code>. This fork listens locally for the wake word, opens a session only when spoken to, and closes it after two quiet minutes.</p>
+</div>
+<div class="dgw" style="margin-top: 36px;">
+<svg class="dg" viewBox="0 0 1312 590" role="img" aria-label="Session lifecycle state machine, with the upstream behaviour for comparison" style="width: 100%; height: auto; display: block;">
+<rect class="up" x="0.0" y="130.0" width="150.0" height="90.0" rx="10"></rect>
+<text class="t" x="14.0" y="157.0">Boot</text>
+<text class="s" x="14.0" y="180.0">Wi-Fi, DACs,</text>
+<text class="s" x="14.0" y="198.5">LCD come up</text>
+<rect class="new" x="230.0" y="60.0" width="260.0" height="220.0" rx="10"></rect>
+<text class="t" x="244.0" y="87.0">Idle · local listening</text>
+<text class="s" x="244.0" y="110.0">WakeNet runs on the S3</text>
+<text class="s" x="244.0" y="128.5">every frame is discarded</text>
+<text class="s cu" x="244.0" y="147.0">0 bytes to OpenAI · $0</text>
+<text class="s" x="244.0" y="165.5">screen: Say “Hi, ESP”</text>
+<text class="s g" x="244.0" y="202.5">nothing reconnects by itself</text>
+<rect class="tgnew" x="441.9" y="51.5" width="34.1" height="17.0" rx="8.5"></rect>
+<text class="tg tgw mid" x="458.9" y="63.5">NEW</text>
+<rect class="chg" x="590.0" y="90.0" width="230.0" height="160.0" rx="10"></rect>
+<text class="t" x="604.0" y="117.0">Connecting</text>
+<text class="s" x="604.0" y="140.0">POST client_secrets</text>
+<text class="s" x="604.0" y="158.5">POST calls (SDP)</text>
+<text class="s" x="604.0" y="177.0">data channel up</text>
+<text class="s" x="604.0" y="195.5">→ session.update</text>
+<rect class="tgchg" x="745.1" y="81.5" width="60.9" height="17.0" rx="8.5"></rect>
+<text class="tg mid" x="775.6" y="93.5">CHANGED</text>
+<rect class="chg" x="920.0" y="40.0" width="392.0" height="262.0" rx="10"></rect>
+<text class="t" x="934.0" y="67.0">Live session · billed</text>
+<rect class="tgchg" x="1237.1" y="31.5" width="60.9" height="17.0" rx="8.5"></rect>
+<text class="tg mid" x="1267.5" y="43.5">CHANGED</text>
+<rect class="sub" x="940.0" y="76.0" width="160.0" height="76.0" rx="7"></rect>
+<text class="t2" x="952.0" y="95.0">Listening</text>
+<text class="s2" x="952.0" y="113.0">mic open</text>
+<text class="s2 ok" x="952.0" y="128.5">screen: green</text>
+<rect class="subn" x="1132.0" y="76.0" width="160.0" height="76.0" rx="7"></rect>
+<text class="t2" x="1144.0" y="95.0">Speaking</text>
+<text class="s2" x="1144.0" y="113.0">mic muted</text>
+<text class="s2 cu" x="1144.0" y="128.5">screen: amber</text>
+<path class="ln" d="M1100.0 100.0 L1125.0 100.0"></path>
+<polygon class="ah" points="1132.0,100.0 1123.0,104.5 1123.0,95.5"></polygon>
+<path class="ln" d="M1132.0 128.0 L1107.0 128.0"></path>
+<polygon class="ah" points="1100.0,128.0 1109.0,123.5 1109.0,132.5"></polygon>
+<text class="s m" x="940.0" y="186.0">→ output_audio_buffer.started</text>
+<text class="s m" x="940.0" y="206.0">← output_audio_buffer.stopped + 300 ms</text>
+<text class="s" x="940.0" y="238.0">server_vad ends each of your turns;</text>
+<text class="s" x="940.0" y="257.0">speech interrupts the reply (barge-in)</text>
+<text class="s g" x="940.0" y="282.0">tool calls run here, see 03</text>
+<path class="ln" d="M150.0 175.0 L223.0 175.0"></path>
+<polygon class="ah" points="230.0,175.0 221.0,179.5 221.0,170.5"></polygon>
+<rect class="pbg" x="159.2" y="152.0" width="61.6" height="18.0" rx="3"></rect>
+<text class="s mid" x="190.0" y="165.0">Wi-Fi up</text>
+<path class="lnc" d="M490.0 170.0 L582.0 170.0"></path>
+<polygon class="ahc" points="590.0,170.0 580.0,175.0 580.0,165.0"></polygon>
+<rect class="pbg" x="506.0" y="147.0" width="68.1" height="18.0" rx="3"></rect>
+<text class="s cu mid" x="540.0" y="160.0">“Hi, ESP”</text>
+<rect class="pbg" x="509.2" y="179.0" width="61.6" height="18.0" rx="3"></rect>
+<text class="s cu mid" x="540.0" y="192.0">or start</text>
+<path class="ln" d="M820.0 170.0 L913.0 170.0"></path>
+<polygon class="ah" points="920.0,170.0 911.0,174.5 911.0,165.5"></polygon>
+<rect class="pbg" x="836.0" y="147.0" width="68.1" height="18.0" rx="3"></rect>
+<text class="s mid" x="870.0" y="160.0">connected</text>
+<rect class="err" x="590.0" y="300.0" width="230.0" height="102.0" rx="10"></rect>
+<text class="t" x="604.0" y="327.0">OpenAI rejects the call</text>
+<text class="s" x="604.0" y="350.0">e.g. no credits remaining</text>
+<text class="s" x="604.0" y="368.5">red, sticky, on screen</text>
+<path class="lnr" d="M705.0 250.0 L705.0 293.0"></path>
+<polygon class="ahr" points="705.0,300.0 700.5,291.0 709.5,291.0"></polygon>
+<path class="lnr" d="M590.0 351.0 L420.0 351.0 L420.0 287.0"></path>
+<polygon class="ahr" points="420.0,280.0 424.5,289.0 415.5,289.0"></polygon>
+<rect class="pbg" x="461.3" y="334.0" width="87.4" height="18.0" rx="3"></rect>
+<text class="s mid" x="505.0" y="347.0">back to idle</text>
+<path class="lnc" d="M1116.0 302.0 L1116.0 440.0 L330.0 440.0 L330.0 288.0"></path>
+<polygon class="ahc" points="330.0,280.0 335.0,290.0 325.0,290.0"></polygon>
+<rect class="pbg" x="547.1" y="431.0" width="351.9" height="18.0" rx="3"></rect>
+<text class="s cu mid" x="723.0" y="444.0">120 s with nothing said, or stop: close, listen again</text>
+<text class="bl" x="0.0" y="500.0">BEFORE · UPSTREAM</text>
+<rect class="stub" x="0.0" y="516.0" width="150.0" height="64.0" rx="10"></rect>
+<text class="t g" x="14.0" y="543.0">Boot</text>
+<rect class="stub" x="230.0" y="516.0" width="260.0" height="64.0" rx="10"></rect>
+<text class="t g" x="244.0" y="543.0">Wi-Fi up → session opens</text>
+<rect class="stub" x="590.0" y="516.0" width="230.0" height="64.0" rx="10"></rect>
+<text class="t g" x="604.0" y="543.0">Open until stop</text>
+<rect class="stub" x="920.0" y="516.0" width="392.0" height="64.0" rx="10"></rect>
+<text class="t g" x="934.0" y="543.0">Wi-Fi drop / return → stop, start</text>
+<path class="lng" d="M150.0 548.0 L223.0 548.0"></path>
+<polygon class="ahg" points="230.0,548.0 221.0,552.5 221.0,543.5"></polygon>
+<path class="lng" d="M490.0 548.0 L583.0 548.0"></path>
+<polygon class="ahg" points="590.0,548.0 581.0,552.5 581.0,543.5"></polygon>
+<path class="lng" d="M820.0 548.0 L913.0 548.0"></path>
+<polygon class="ahg" points="920.0,548.0 911.0,552.5 911.0,543.5"></polygon>
+</svg>
+</div>
+</div>
+<div class="board" id="changes" style="width: 1440px; height: 2140px; box-sizing: border-box; padding: 64px; display: flex; flex-direction: column; background: #F4F1E8; color: #1A1917; font-family: 'IBM Plex Sans', system-ui, sans-serif;">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 920px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A;">05 · WHAT CHANGED, AND WHY</div>
+<h2 class="h2" style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 44px; line-height: 1.1; letter-spacing: -0.01em;">Every change, with the evidence behind it</h2>
+<p style="margin: 0; font-size: 18px; line-height: 1.55; color: #4F4B44;">Each row is a decision made on the bench. Where the reason is a number, it was measured on this board.</p>
+</div>
+<div class="tblw" style="margin-top: 36px;">
+<table class="tbl" style="width: 100%; border-collapse: collapse; table-layout: fixed;">
+<colgroup><col style="width: 13%;"><col style="width: 25%;"><col style="width: 30%;"><col style="width: 32%;"></colgroup>
+<thead><tr><th style="text-align: left; padding: 12px 14px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.12em; color: #6B665E; border-bottom: 2px solid #1A1917;">AREA</th><th style="text-align: left; padding: 12px 14px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.12em; color: #6B665E; border-bottom: 2px solid #1A1917;">BEFORE · UPSTREAM</th><th style="text-align: left; padding: 12px 14px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.12em; color: #6B665E; border-bottom: 2px solid #1A1917;">AFTER · THIS FORK</th><th style="text-align: left; padding: 12px 14px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.12em; color: #6B665E; border-bottom: 2px solid #1A1917;">WHY</th></tr></thead>
+<tbody>
+<tr><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; font-weight: 600;">Board</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">ESP32-S3-Korvo-2</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #A2471A;">ESP32-S3-BOX-3 (N16R16) with its dock</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">The box on the bench; its dock exposes a spare I2C bus</td></tr>
+<tr><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; font-weight: 600;">Toolchain</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">ESP-IDF v5.4 or master</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #A2471A;">ESP-IDF v5.5.5</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">v5.4 fails on an <code>esp_asrc</code> <code>-Werror=format</code></td></tr>
+<tr><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; font-weight: 600;">Flash layout</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">4 MB declared · factory 3 MB</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #A2471A;">16 MB · factory 6 MB · model 4 MB</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">The app is about 4.1 MB; upstream CI only checks that an ELF exists</td></tr>
+<tr><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; font-weight: 600;">Console</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">USB-UART bridge</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #A2471A;">Native USB-Serial-JTAG</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">The BOX-3 has no UART bridge; without this the demo can't be driven</td></tr>
+<tr><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; font-weight: 600;">Tools</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">Six <code>printf</code> setters: light, RGB, volume, door</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #A2471A;"><code>set_channel_voltage</code> · <code>get_channel_voltage</code> · <code>set_speaker_volume</code></td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">The model moves real hardware, and the volume tool really sets the codec</td></tr>
+<tr><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; font-weight: 600;">Limits</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">None needed: nothing moved</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #A2471A;">Channel 0–15, 0–3200 mV; out of range is refused, never clipped</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">The model decides what to do; the firmware decides what's allowed</td></tr>
+<tr><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; font-weight: 600;">Argument parsing</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">A wrong JSON type reported success and kept the previous value</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #A2471A;"><code>"3"</code> and <code>3</code> both parse; no value survives between calls</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">“Set channel three” arrived as a string and silently drove channel 0</td></tr>
+<tr><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; font-weight: 600;">Tool result</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;"><code>{"ok":true}</code> whenever the name matched</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #A2471A;">The real outcome, or the error, goes back to the model</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">The model can't claim a change that didn't happen</td></tr>
+<tr><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; font-weight: 600;">Echo</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">On-chip AEC only</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #A2471A;">AEC reference on TDM slot 1, plus the mic muted while the box speaks</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">Slot RMS under a tone: 852 / 28378 / 797 / 188. Low-cost AEC can't cancel the speaker at usable volume</td></tr>
+<tr><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; font-weight: 600;">Reopening the mic</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">n/a</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #A2471A;"><code>output_audio_buffer.stopped</code> + 300 ms</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;"><code>response.done</code> fires up to 3 s before the speaker stops</td></tr>
+<tr><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; font-weight: 600;">Turn taking</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">Server defaults</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #A2471A;"><code>server_vad</code> (600 ms prefix, 700 ms silence), barge-in, near-field noise reduction</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">Stops the model answering its own voice</td></tr>
+<tr><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; font-weight: 600;">Session start</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">Automatic when Wi-Fi comes up</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #A2471A;">“Hi, ESP” (WakeNet, on-chip) or <code>start</code></td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">A realtime session bills while open; idle now sends nothing</td></tr>
+<tr><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; font-weight: 600;">Session end</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">Only on <code>stop</code></td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #A2471A;">120 s with nothing said closes it; no silent reconnect</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">Cost is bounded by design</td></tr>
+<tr><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; font-weight: 600;">Model</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;"><code>gpt-realtime-2</code></td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #A2471A;"><code>gpt-realtime-mini</code>, switchable with <code>model</code></td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">Realtime isn't in OpenAI's free tier; mini is the affordable one</td></tr>
+<tr><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; font-weight: 600;">Visibility</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">Serial log</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #A2471A;">LCD: status, transcript, last tool call, OpenAI's rejection reason</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">You can see what it did without a laptop, and film it</td></tr>
+<tr><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; font-weight: 600;">Diagnostics</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;"><code>start stop i assert wifi m text rec2play</code></td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #A2471A;">adds <code>wake micscan trace vad vol model net vref dac</code></td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">Measure, don't guess: <code>micscan</code> found the AEC slot, <code>vref</code> calibrates the DAC</td></tr>
+<tr><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; font-weight: 600;">Playback jitter</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">0, by accident: it initialises to 0 and then multiplies</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #A2471A;">0, on purpose</td><td style="padding: 13px 14px; vertical-align: top; font-size: 15px; line-height: 1.45; border-bottom: 1px solid #D6CFBF; color: #4F4B44;">A non-zero threshold made <code>av_render</code> re-buffer on every dip: six audible breaks in one reply</td></tr>
+</tbody>
+</table>
+</div>
+<div style="margin-top: 56px; display: flex; flex-direction: column;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A; padding-bottom: 6px;">THREE COMMITS ON TOP OF UPSTREAM c57e51b</div>
+<div class="split" style="display: flex; gap: 20px; align-items: baseline; padding: 14px 0; border-bottom: 1px solid #D6CFBF;">
+<a href="https://github.com/amahpour/esp-webrtc-solution/commit/638c8b36ff6878c12cd5f7dc218571b8f82f81d9" style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 14px; width: 90px; flex-shrink: 0;">638c8b3</a>
+<span style="flex: 1 1 0; font-size: 16px; font-weight: 500;">esp_capture: vendor and surface the AFE wake-word result</span>
+<span style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; color: #6B665E;">84 files · +21,643 (a vendored copy; 2 functional edits)</span>
+</div>
+<div class="split" style="display: flex; gap: 20px; align-items: baseline; padding: 14px 0; border-bottom: 1px solid #D6CFBF;">
+<a href="https://github.com/amahpour/esp-webrtc-solution/commit/0c91176d9329c52ea703b6965e4a529d4c08e5c0" style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 14px; width: 90px; flex-shrink: 0;">0c91176</a>
+<span style="flex: 1 1 0; font-size: 16px; font-weight: 500;">openai_demo: bring the demo up on the ESP32-S3-BOX-3</span>
+<span style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; color: #6B665E;">3 files · +9 −2</span>
+</div>
+<div class="split" style="display: flex; gap: 20px; align-items: baseline; padding: 14px 0; border-bottom: 1px solid #D6CFBF;">
+<a href="https://github.com/amahpour/esp-webrtc-solution/commit/5e1fe1d6dd7a94da20368776709f360ba20e2cc1" style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 14px; width: 90px; flex-shrink: 0;">5e1fe1d</a>
+<span style="flex: 1 1 0; font-size: 16px; font-weight: 500;">openai_demo: stubs to real electrons on the bench DAC</span>
+<span style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; color: #6B665E;">14 files · +1,708 −147</span>
+</div>
+</div>
+<div style="margin-top: 40px; font-size: 14px; line-height: 1.6; color: #6B665E;">Designed in Claude Design and exported as this static page. Diagrams show the code on <code>feature/oc-20-real-function-calls</code>; upstream is <a href="https://github.com/espressif/esp-webrtc-solution">espressif/esp-webrtc-solution</a>.</div>
+</div>
+<div class="board" id="glossary" style="width: 1440px; height: 1680px; box-sizing: border-box; padding: 64px; display: flex; flex-direction: column; background: #F4F1E8; color: #1A1917; font-family: 'IBM Plex Sans', system-ui, sans-serif;">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 920px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A;">GLOSSARY</div>
+<h2 class="h2" style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 44px; line-height: 1.1; letter-spacing: -0.01em;">Terms on this page</h2>
+<p style="margin: 0; font-size: 18px; line-height: 1.55; color: #4F4B44;">Short, plain-language definitions, as they apply to this project.</p>
+</div>
+<div class="gl" style="margin-top: 36px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px; align-items: start;">
+<div style="display: flex; flex-direction: column; gap: 18px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A; padding-bottom: 10px; border-bottom: 2px solid #1A1917;">VOICE AND CLOUD</div>
+<dl style="margin: 0; display: flex; flex-direction: column; gap: 16px;">
+<div id="g-realtime-api"><dt style="font-size: 16px; font-weight: 600;">Realtime API</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">OpenAI&#x27;s speech-to-speech service: audio in; spoken replies and tool calls out, over one live connection.</dd></div>
+<div id="g-webrtc"><dt style="font-size: 16px; font-weight: 600;">WebRTC</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">The standard for live audio between two endpoints. Here the endpoints are the box and OpenAI.</dd></div>
+<div id="g-sdp"><dt style="font-size: 16px; font-weight: 600;">SDP</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">Session Description Protocol. The text offer and answer the two sides swap before any audio flows, agreeing on codecs, network addresses and encryption.</dd></div>
+<div id="g-ice"><dt style="font-size: 16px; font-weight: 600;">ICE</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">How the two sides find a network path to each other, by trying pairs of candidate addresses.</dd></div>
+<div id="g-dtls---srtp"><dt style="font-size: 16px; font-weight: 600;">DTLS / SRTP</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">WebRTC&#x27;s encryption: DTLS agrees the keys, SRTP encrypts the audio.</dd></div>
+<div id="g-opus"><dt style="font-size: 16px; font-weight: 600;">Opus</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">The audio codec on the link. It compresses speech enough to travel well over Wi-Fi.</dd></div>
+<div id="g-data-channel"><dt style="font-size: 16px; font-weight: 600;">Data channel</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">A message pipe inside the WebRTC connection. It carries JSON events: session settings, tool calls and their results.</dd></div>
+<div id="g-ephemeral-token"><dt style="font-size: 16px; font-weight: 600;">Ephemeral token</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">A short-lived key from /client_secrets, used to open the call.</dd></div>
+<div id="g-session-update"><dt style="font-size: 16px; font-weight: 600;">session.update</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">The message that configures a session: instructions, tools, turn detection and audio settings.</dd></div>
+<div id="g-tool-call"><dt style="font-size: 16px; font-weight: 600;">Tool call</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">The model asking the device to run a named function with JSON arguments. The device runs it and replies with the result.</dd></div>
+<div id="g-server-vad"><dt style="font-size: 16px; font-weight: 600;">Server VAD</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">Voice activity detection on OpenAI&#x27;s side: it decides when you start and stop talking.</dd></div>
+<div id="g-barge-in"><dt style="font-size: 16px; font-weight: 600;">Barge-in</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">Talking over a reply to interrupt it.</dd></div>
+<div id="g-transcription"><dt style="font-size: 16px; font-weight: 600;">Transcription</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">A text copy of the speech, used to debug the audio path and shown on the screen.</dd></div>
+</dl>
+</div>
+<div style="display: flex; flex-direction: column; gap: 18px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A; padding-bottom: 10px; border-bottom: 2px solid #1A1917;">AUDIO ON THE BOX</div>
+<dl style="margin: 0; display: flex; flex-direction: column; gap: 16px;">
+<div id="g-pcm"><dt style="font-size: 16px; font-weight: 600;">PCM</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">Raw, uncompressed audio samples.</dd></div>
+<div id="g-codec-chip"><dt style="font-size: 16px; font-weight: 600;">Codec chip</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">Converts between analog and digital audio. On the BOX-3: the ES7210 for the mics, the ES8311 for the speaker.</dd></div>
+<div id="g-tdm-slot"><dt style="font-size: 16px; font-weight: 600;">TDM slot</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">One channel of a multi-channel digital audio stream. The ES7210 sends four slots down one wire.</dd></div>
+<div id="g-aec"><dt style="font-size: 16px; font-weight: 600;">AEC</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">Acoustic echo cancellation: subtracting what the speaker plays from what the mic hears.</dd></div>
+<div id="g-aec-reference"><dt style="font-size: 16px; font-weight: 600;">AEC reference</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">The copy of the speaker signal the AEC subtracts. On the BOX-3 it arrives on TDM slot 1, measured with micscan.</dd></div>
+<div id="g-afe"><dt style="font-size: 16px; font-weight: 600;">AFE</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">Espressif&#x27;s audio front end. It runs echo cancellation, noise suppression and the wake-word engine.</dd></div>
+<div id="g-wakenet"><dt style="font-size: 16px; font-weight: 600;">WakeNet</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">Espressif&#x27;s on-device wake-word model. Here it listens for “Hi, ESP”, and nothing leaves the box until it hears it.</dd></div>
+<div id="g-half-duplex"><dt style="font-size: 16px; font-weight: 600;">Half duplex</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">One direction at a time: the mic is muted while the box is speaking.</dd></div>
+<div id="g-jitter-buffer"><dt style="font-size: 16px; font-weight: 600;">Jitter buffer</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">Audio held back before playback to smooth out uneven network arrival. Set to zero here, on purpose.</dd></div>
+<div id="g-micscan"><dt style="font-size: 16px; font-weight: 600;">micscan</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">A console command that plays a tone and measures every TDM slot, to find which one carries the AEC reference.</dd></div>
+</dl>
+</div>
+<div style="display: flex; flex-direction: column; gap: 18px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A; padding-bottom: 10px; border-bottom: 2px solid #1A1917;">HARDWARE AND FIRMWARE</div>
+<dl style="margin: 0; display: flex; flex-direction: column; gap: 16px;">
+<div id="g-esp32-s3"><dt style="font-size: 16px; font-weight: 600;">ESP32-S3</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">Espressif&#x27;s dual-core Wi-Fi microcontroller, the chip inside the BOX-3 and the Korvo-2.</dd></div>
+<div id="g-esp-idf"><dt style="font-size: 16px; font-weight: 600;">ESP-IDF</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">Espressif&#x27;s SDK and build system. This fork uses v5.5.5.</dd></div>
+<div id="g-partition-table"><dt style="font-size: 16px; font-weight: 600;">Partition table</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">How the flash is divided up. Here: a 6 MB slot for the app and a 4 MB slot for the wake-word model.</dd></div>
+<div id="g-psram"><dt style="font-size: 16px; font-weight: 600;">PSRAM</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">External RAM beside the chip, used for large buffers such as the display&#x27;s.</dd></div>
+<div id="g-usb-serial-jtag"><dt style="font-size: 16px; font-weight: 600;">USB-Serial-JTAG</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">The S3&#x27;s built-in USB port for the console, logs and flashing. The BOX-3 has no separate serial chip.</dd></div>
+<div id="g-uart-bridge"><dt style="font-size: 16px; font-weight: 600;">UART bridge</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">A separate USB-to-serial chip, as on the Korvo-2.</dd></div>
+<div id="g-i2c"><dt style="font-size: 16px; font-weight: 600;">I2C</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">A two-wire bus for talking to chips. The DACs sit on the dock&#x27;s bus: SCL on GPIO40, SDA on GPIO41.</dd></div>
+<div id="g-dac7578"><dt style="font-size: 16px; font-weight: 600;">DAC7578</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">TI&#x27;s 8-channel, 12-bit digital-to-analog converter: it turns a number into a voltage.</dd></div>
+<div id="g-vref"><dt style="font-size: 16px; font-weight: 600;">Vref</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">The DAC&#x27;s reference voltage. Output = code ÷ 4095 × Vref, so it has to be measured, not assumed.</dd></div>
+<div id="g-firmware-clamp"><dt style="font-size: 16px; font-weight: 600;">Firmware clamp</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">A limit the firmware enforces whatever the model asks. Out-of-range requests are refused, never clipped.</dd></div>
+<div id="g-lvgl"><dt style="font-size: 16px; font-weight: 600;">LVGL</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">An open-source graphics library for small screens. It draws the status display.</dd></div>
+<div id="g-bsp"><dt style="font-size: 16px; font-weight: 600;">BSP</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">Board support package: Espressif&#x27;s ready-made drivers for a board. Skipped here because it claims both I2C buses.</dd></div>
+<div id="g-vendored-component"><dt style="font-size: 16px; font-weight: 600;">Vendored component</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">A copy of a library kept inside this repo so it can be patched. Here: esp_capture.</dd></div>
+<div id="g-console"><dt style="font-size: 16px; font-weight: 600;">Console</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">The typed command line over USB: start, stop, micscan, vref, dac and more.</dd></div>
+</dl>
+</div>
+</div>
+</div>
+</main>
+</body>
+</html>

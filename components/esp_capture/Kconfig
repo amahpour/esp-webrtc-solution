@@ -1,0 +1,35 @@
+menu "Espressif Capture Configuration"
+    config ESP_CAPTURE_ENABLE_AUDIO
+        bool "Enable Audio Capture"
+        default y
+
+    config ESP_CAPTURE_ENABLE_VIDEO
+        bool "Enable Video Capture"
+        default y
+
+    config ESP_CAPTURE_ENABLE_VIDEO_OVERLAY
+        bool "Enable Video Overlay for Capture"
+        default y
+        depends on ESP_CAPTURE_ENABLE_VIDEO
+
+    config ESP_CAPTURE_ENABLE_VIDEO_DECODER
+        bool "Enable Video Decoder for Capture"
+        default n
+        depends on ESP_CAPTURE_ENABLE_VIDEO
+
+    config ESP_CAPTURE_VIDEO_DEC_OUT_POOL_SIZE
+        int "Video decoder output pool frame count"
+        default 3
+        range 2 4
+        depends on ESP_CAPTURE_ENABLE_VIDEO_DECODER
+        help
+            Number of decoded frames kept in the decoder output pool when
+            full_speed_decode is enabled in esp_capture_cfg_t.
+            Prefer 3 so decode can run ahead of encode without blocking.
+
+    config ESP_CAPTURE_ENABLE_PERF_MON
+        bool "Enable Performance Monitor for Capture"
+        default n
+
+    rsource "impl/capture_text_overlay/Kconfig"
+endmenu

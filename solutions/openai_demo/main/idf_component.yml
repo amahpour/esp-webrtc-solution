@@ -6,4 +6,12 @@ dependencies:
   ## Import needed components only
   esp_peer:
     override_path: ../../../components/esp_peer
+  ## Vendored so we can surface the AFE's wake-word result, which the released
+  ## component computes and then discards (see components/esp_capture/README-fork.md)
+  espressif/esp_capture:
+    override_path: ../../../components/esp_capture
   ## Note: openai_signaling is implemented locally in openai_signaling.c
+  ## Status display on the BOX-3 LCD (esp_lcd + LVGL, no BSP)
+  espressif/esp_lcd_ili9341: "^2"
+  espressif/esp_lvgl_port: "^2"
+  lvgl/lvgl: "^9"

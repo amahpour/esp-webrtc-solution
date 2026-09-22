@@ -36,3 +36,6 @@ coverage.info
 coverage_report/
 
 .vscode
+
+# stray MCP server logs, not part of the project
+/target/
