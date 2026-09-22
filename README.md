@@ -1,5 +1,11 @@
 # esp_webrtc_solution
 
+> **This is a fork.** [`solutions/openai_demo`](solutions/openai_demo/) has been rebuilt as a voice-driven bench lab assistant on the **ESP32-S3-BOX-3**: the tools the model calls drive real DAC hardware over I2C behind firmware limits, a wake word keeps the box off the network until it is spoken to, and a status screen shows what it heard and did. Everything else in this repository is upstream Espressif code.
+>
+> - Architecture, upstream and this fork side by side: **https://amahpour.github.io/esp-webrtc-solution/**
+> - Demo and build instructions: [`solutions/openai_demo/README.md`](solutions/openai_demo/README.md)
+> - Upstream: [espressif/esp-webrtc-solution](https://github.com/espressif/esp-webrtc-solution)
+
 ## Introduction
 
 This repository provides everything needed to build a WebRTC application.
@@ -24,7 +30,7 @@ Additionally, the repository contains demo applications under `solutions/` that 
 
 | Folder | Description |
 |--------|-------------|
-| [`openai_demo`](solutions/openai_demo/) | Real-time WebRTC session to an OpenAI Realtime server with a custom signaling path. |
+| [`openai_demo`](solutions/openai_demo/) | **Rebuilt in this fork:** voice lab assistant on the ESP32-S3-BOX-3 — real-time WebRTC session to OpenAI, with tool calls that drive bench DAC hardware. |
 | [`whip_demo`](solutions/whip_demo/) | Publishes AV to a server using WHIP (`esp_webrtc`). |
 | [`kvs_master`](solutions/kvs_master/) | Amazon Kinesis Video Streams (**MASTER**): receives SDP offers from viewers and answers over KVS signaling. |
 | [`kms_demo`](solutions/kms_demo/) | Publisher to **Kurento** Media Server; includes a browser viewer for the stream. |
