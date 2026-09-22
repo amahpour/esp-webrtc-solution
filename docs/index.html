@@ -16,6 +16,8 @@ code{font-family:'IBM Plex Mono', ui-monospace, monospace;font-size:.9em}
 .dg text{font-family:'IBM Plex Sans', system-ui, sans-serif;fill:#1A1917}
 .dg .t{font-size:15px;font-weight:600}
 .dg .t2{font-size:13px;font-weight:600}
+.dg .tl{font-size:17px;font-weight:600}
+.dg .sl{font-size:13.5px;fill:#4F4B44}
 .dg .s{font-size:12.5px;fill:#4F4B44}
 .dg .s2{font-size:12px;fill:#4F4B44}
 .dg .m{font-family:'IBM Plex Mono', ui-monospace, monospace;font-size:11.5px}
@@ -69,6 +71,7 @@ html{scroll-behavior:smooth;color-scheme:light}
 .h1{font-size:46px!important}
 .h2{font-size:32px!important}
 .big{font-size:28px!important}
+.glance,.gl{grid-template-columns:minmax(0,1fr)!important}
 .stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}
 .split{flex-direction:column!important;gap:12px!important}
 }
@@ -76,7 +79,7 @@ html{scroll-behavior:smooth;color-scheme:light}
 </head>
 <body>
 <nav class="top" aria-label="Sections"><div class="in"><span class="brand">BOX-3 VOICE LAB</span>
-<a href="#overview">Overview</a><a href="#before">Before</a><a href="#after">After</a><a href="#toolcall">Tool call</a><a href="#lifecycle">Lifecycle</a><a href="#changes">What changed</a>
+<a href="#overview">Overview</a><a href="#glance">At a glance</a><a href="#before">Before</a><a href="#after">After</a><a href="#toolcall">Tool call</a><a href="#lifecycle">Lifecycle</a><a href="#changes">What changed</a><a href="#glossary">Glossary</a>
 </div></nav>
 <main>
 <div class="board" id="overview" style="width: 1440px; height: 780px; box-sizing: border-box; padding: 72px 64px 64px; display: flex; flex-direction: column; background: #F4F1E8; color: #1A1917; font-family: 'IBM Plex Sans', system-ui, sans-serif;">
@@ -109,6 +112,105 @@ html{scroll-behavior:smooth;color-scheme:light}
 <span style="display: flex; align-items: center; gap: 10px;"><svg width="34" height="10" viewBox="0 0 34 10" aria-hidden="true"><path d="M0 5 L25 5" style="stroke: #B04E1C; stroke-width: 2;"></path><polygon points="34,5 24,0 24,10" style="fill: #B04E1C;"></polygon></svg>New path through the system</span>
 </div>
 <div style="margin-top: 28px; font-size: 14px; line-height: 1.6; color: #6B665E;">Source: <a href="https://github.com/amahpour/esp-webrtc-solution/tree/feature/oc-20-real-function-calls/solutions/openai_demo">amahpour/esp-webrtc-solution</a> on <code>feature/oc-20-real-function-calls</code>, compared against <a href="https://github.com/espressif/esp-webrtc-solution/tree/c57e51bccd0c25009522b8ff01a91ef2c72dfb6b/solutions/openai_demo">espressif/esp-webrtc-solution</a> at <code>c57e51b</code>. Measured on the board, 28 Aug – 1 Sep 2026.</div>
+</div>
+<div class="board" id="glance" style="width: 1440px; height: 1000px; box-sizing: border-box; padding: 64px; display: flex; flex-direction: column; background: #F4F1E8; color: #1A1917; font-family: 'IBM Plex Sans', system-ui, sans-serif;">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 920px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A;">AT A GLANCE</div>
+<h2 class="h2" style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 44px; line-height: 1.1; letter-spacing: -0.01em;">Same voice link, different ends</h2>
+<p style="margin: 0; font-size: 18px; line-height: 1.55; color: #4F4B44;">Upstream's tools only print. This fork's move real hardware inside limits the firmware sets, and the box stays offline until it's spoken to.</p>
+</div>
+<div class="glance" style="margin-top: 32px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px;">
+<div style="padding: 24px; background: #EAE5D8; border-radius: 14px; display: flex; flex-direction: column; gap: 14px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; font-weight: 500; letter-spacing: 0.14em; color: #6B665E;">BEFORE · UPSTREAM</div>
+<svg class="dg" viewBox="0 0 600 392" role="img" aria-label="Upstream at a glance" style="width: 100%; height: auto; display: block;">
+<rect class="up" x="160.0" y="0.0" width="280.0" height="58.0" rx="10"></rect>
+<text class="tl mid" x="300.0" y="35.0">OpenAI Realtime</text>
+<path class="ln" d="M300.0 65.0 L300.0 103.0"></path>
+<polygon class="ah" points="300.0,110.0 295.5,101.0 304.5,101.0"></polygon>
+<polygon class="ah" points="300.0,58.0 304.5,67.0 295.5,67.0"></polygon>
+<rect class="bbg" x="309.0" y="76.0" width="122.0" height="18.0" rx="3"></rect>
+<text class="sl g" x="314.0" y="89.0">always connected</text>
+<rect class="up" x="10.0" y="110.0" width="580.0" height="150.0" rx="12"></rect>
+<text class="tl" x="28.0" y="138.0">ESP32-S3-Korvo-2</text>
+<rect class="stub" x="25.0" y="156.0" width="170.0" height="84.0" rx="10"></rect>
+<text class="tl mid g" x="110.0" y="204.0">No wake word</text>
+<rect class="up" x="215.0" y="156.0" width="170.0" height="84.0" rx="10"></rect>
+<text class="tl mid" x="300.0" y="195.0">Voice link</text>
+<text class="sl mid" x="300.0" y="216.0">speech in and out</text>
+<rect class="stub" x="405.0" y="156.0" width="170.0" height="84.0" rx="10"></rect>
+<text class="tl mid g" x="490.0" y="204.0">Tools only print</text>
+<rect class="stub" x="25.0" y="314.0" width="170.0" height="76.0" rx="10"></rect>
+<text class="tl mid g" x="110.0" y="358.0">No screen</text>
+<rect class="up" x="215.0" y="314.0" width="170.0" height="76.0" rx="10"></rect>
+<text class="tl mid" x="300.0" y="358.0">Mic + speaker</text>
+<rect class="stub" x="405.0" y="314.0" width="170.0" height="76.0" rx="10"></rect>
+<text class="tl mid g" x="490.0" y="358.0">Nothing to drive</text>
+<path class="ln" d="M300.0 267.0 L300.0 307.0"></path>
+<polygon class="ah" points="300.0,314.0 295.5,305.0 304.5,305.0"></polygon>
+<polygon class="ah" points="300.0,260.0 304.5,269.0 295.5,269.0"></polygon>
+</svg>
+</div>
+<div style="padding: 24px; background: #EAE5D8; border-radius: 14px; display: flex; flex-direction: column; gap: 14px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A;">AFTER · THIS FORK</div>
+<svg class="dg" viewBox="0 0 600 392" role="img" aria-label="This fork at a glance" style="width: 100%; height: auto; display: block;">
+<rect class="up" x="160.0" y="0.0" width="280.0" height="58.0" rx="10"></rect>
+<text class="tl mid" x="300.0" y="35.0">OpenAI Realtime</text>
+<path class="lnc" d="M300.0 66.0 L300.0 102.0"></path>
+<polygon class="ahc" points="300.0,110.0 295.0,100.0 305.0,100.0"></polygon>
+<polygon class="ahc" points="300.0,58.0 305.0,68.0 295.0,68.0"></polygon>
+<rect class="bbg" x="309.0" y="76.0" width="150.0" height="18.0" rx="3"></rect>
+<text class="sl cu" x="314.0" y="89.0">only after “Hi, ESP”</text>
+<rect class="chg" x="10.0" y="110.0" width="580.0" height="150.0" rx="12"></rect>
+<text class="tl" x="28.0" y="138.0">ESP32-S3-BOX-3</text>
+<rect class="new" x="25.0" y="156.0" width="170.0" height="84.0" rx="10"></rect>
+<text class="tl mid" x="110.0" y="195.0">Wake word</text>
+<text class="sl mid" x="110.0" y="216.0">on the device</text>
+<rect class="up" x="215.0" y="156.0" width="170.0" height="84.0" rx="10"></rect>
+<text class="tl mid" x="300.0" y="195.0">Voice link</text>
+<text class="sl mid" x="300.0" y="216.0">speech in and out</text>
+<rect class="new" x="405.0" y="156.0" width="170.0" height="84.0" rx="10"></rect>
+<text class="tl mid" x="490.0" y="195.0">Real tools</text>
+<text class="sl mid" x="490.0" y="216.0">with limits</text>
+<rect class="new" x="25.0" y="314.0" width="170.0" height="76.0" rx="10"></rect>
+<text class="tl mid" x="110.0" y="349.0">Screen</text>
+<text class="sl mid" x="110.0" y="370.0">what it heard and did</text>
+<rect class="up" x="215.0" y="314.0" width="170.0" height="76.0" rx="10"></rect>
+<text class="tl mid" x="300.0" y="358.0">Mic + speaker</text>
+<rect class="new" x="405.0" y="314.0" width="170.0" height="76.0" rx="10"></rect>
+<text class="tl mid" x="490.0" y="349.0">Bench DACs</text>
+<text class="sl mid" x="490.0" y="370.0">0–3.2 V out</text>
+<path class="ln" d="M300.0 267.0 L300.0 307.0"></path>
+<polygon class="ah" points="300.0,314.0 295.5,305.0 304.5,305.0"></polygon>
+<polygon class="ah" points="300.0,260.0 304.5,269.0 295.5,269.0"></polygon>
+<path class="lnc" d="M110.0 260.0 L110.0 306.0"></path>
+<polygon class="ahc" points="110.0,314.0 105.0,304.0 115.0,304.0"></polygon>
+<path class="lnc" d="M490.0 260.0 L490.0 306.0"></path>
+<polygon class="ahc" points="490.0,314.0 485.0,304.0 495.0,304.0"></polygon>
+</svg>
+</div>
+</div>
+<div class="stats" style="margin-top: 32px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px;">
+<div style="padding: 18px 20px; background: #FFFDF8; border: 1px solid #D6CFBF; border-radius: 12px; display: flex; flex-direction: column; gap: 6px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A;">TOOLS</div>
+<div style="font-size: 15px; color: #6B665E; text-decoration: line-through;">print only</div>
+<div style="font-size: 20px; font-weight: 600; line-height: 1.25;">move real hardware</div>
+</div>
+<div style="padding: 18px 20px; background: #FFFDF8; border: 1px solid #D6CFBF; border-radius: 12px; display: flex; flex-direction: column; gap: 6px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A;">CONNECTION</div>
+<div style="font-size: 15px; color: #6B665E; text-decoration: line-through;">always on</div>
+<div style="font-size: 20px; font-weight: 600; line-height: 1.25;">only when spoken to</div>
+</div>
+<div style="padding: 18px 20px; background: #FFFDF8; border: 1px solid #D6CFBF; border-radius: 12px; display: flex; flex-direction: column; gap: 6px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A;">LIMITS</div>
+<div style="font-size: 15px; color: #6B665E; text-decoration: line-through;">none</div>
+<div style="font-size: 20px; font-weight: 600; line-height: 1.25;">enforced in firmware</div>
+</div>
+<div style="padding: 18px 20px; background: #FFFDF8; border: 1px solid #D6CFBF; border-radius: 12px; display: flex; flex-direction: column; gap: 6px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A;">FEEDBACK</div>
+<div style="font-size: 15px; color: #6B665E; text-decoration: line-through;">serial log</div>
+<div style="font-size: 20px; font-weight: 600; line-height: 1.25;">screen on the box</div>
+</div>
+</div>
 </div>
 <div class="board" id="before" style="width: 1440px; height: 1330px; box-sizing: border-box; padding: 64px; display: flex; flex-direction: column; background: #F4F1E8; color: #1A1917; font-family: 'IBM Plex Sans', system-ui, sans-serif;">
 <div style="display: flex; flex-direction: column; gap: 12px; max-width: 920px;">
@@ -733,6 +835,67 @@ html{scroll-behavior:smooth;color-scheme:light}
 </div>
 </div>
 <div style="margin-top: 40px; font-size: 14px; line-height: 1.6; color: #6B665E;">Designed in Claude Design and exported as this static page. Diagrams show the code on <code>feature/oc-20-real-function-calls</code>; upstream is <a href="https://github.com/espressif/esp-webrtc-solution">espressif/esp-webrtc-solution</a>.</div>
+</div>
+<div class="board" id="glossary" style="width: 1440px; height: 1680px; box-sizing: border-box; padding: 64px; display: flex; flex-direction: column; background: #F4F1E8; color: #1A1917; font-family: 'IBM Plex Sans', system-ui, sans-serif;">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 920px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A;">GLOSSARY</div>
+<h2 class="h2" style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 44px; line-height: 1.1; letter-spacing: -0.01em;">Terms on this page</h2>
+<p style="margin: 0; font-size: 18px; line-height: 1.55; color: #4F4B44;">Short, plain-language definitions, as they apply to this project.</p>
+</div>
+<div class="gl" style="margin-top: 36px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px; align-items: start;">
+<div style="display: flex; flex-direction: column; gap: 18px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A; padding-bottom: 10px; border-bottom: 2px solid #1A1917;">VOICE AND CLOUD</div>
+<dl style="margin: 0; display: flex; flex-direction: column; gap: 16px;">
+<div id="g-realtime-api"><dt style="font-size: 16px; font-weight: 600;">Realtime API</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">OpenAI&#x27;s speech-to-speech service: audio in; spoken replies and tool calls out, over one live connection.</dd></div>
+<div id="g-webrtc"><dt style="font-size: 16px; font-weight: 600;">WebRTC</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">The standard for live audio between two endpoints. Here the endpoints are the box and OpenAI.</dd></div>
+<div id="g-sdp"><dt style="font-size: 16px; font-weight: 600;">SDP</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">Session Description Protocol. The text offer and answer the two sides swap before any audio flows, agreeing on codecs, network addresses and encryption.</dd></div>
+<div id="g-ice"><dt style="font-size: 16px; font-weight: 600;">ICE</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">How the two sides find a network path to each other, by trying pairs of candidate addresses.</dd></div>
+<div id="g-dtls---srtp"><dt style="font-size: 16px; font-weight: 600;">DTLS / SRTP</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">WebRTC&#x27;s encryption: DTLS agrees the keys, SRTP encrypts the audio.</dd></div>
+<div id="g-opus"><dt style="font-size: 16px; font-weight: 600;">Opus</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">The audio codec on the link. It compresses speech enough to travel well over Wi-Fi.</dd></div>
+<div id="g-data-channel"><dt style="font-size: 16px; font-weight: 600;">Data channel</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">A message pipe inside the WebRTC connection. It carries JSON events: session settings, tool calls and their results.</dd></div>
+<div id="g-ephemeral-token"><dt style="font-size: 16px; font-weight: 600;">Ephemeral token</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">A short-lived key from /client_secrets, used to open the call.</dd></div>
+<div id="g-session-update"><dt style="font-size: 16px; font-weight: 600;">session.update</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">The message that configures a session: instructions, tools, turn detection and audio settings.</dd></div>
+<div id="g-tool-call"><dt style="font-size: 16px; font-weight: 600;">Tool call</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">The model asking the device to run a named function with JSON arguments. The device runs it and replies with the result.</dd></div>
+<div id="g-server-vad"><dt style="font-size: 16px; font-weight: 600;">Server VAD</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">Voice activity detection on OpenAI&#x27;s side: it decides when you start and stop talking.</dd></div>
+<div id="g-barge-in"><dt style="font-size: 16px; font-weight: 600;">Barge-in</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">Talking over a reply to interrupt it.</dd></div>
+<div id="g-transcription"><dt style="font-size: 16px; font-weight: 600;">Transcription</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">A text copy of the speech, used to debug the audio path and shown on the screen.</dd></div>
+</dl>
+</div>
+<div style="display: flex; flex-direction: column; gap: 18px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A; padding-bottom: 10px; border-bottom: 2px solid #1A1917;">AUDIO ON THE BOX</div>
+<dl style="margin: 0; display: flex; flex-direction: column; gap: 16px;">
+<div id="g-pcm"><dt style="font-size: 16px; font-weight: 600;">PCM</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">Raw, uncompressed audio samples.</dd></div>
+<div id="g-codec-chip"><dt style="font-size: 16px; font-weight: 600;">Codec chip</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">Converts between analog and digital audio. On the BOX-3: the ES7210 for the mics, the ES8311 for the speaker.</dd></div>
+<div id="g-tdm-slot"><dt style="font-size: 16px; font-weight: 600;">TDM slot</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">One channel of a multi-channel digital audio stream. The ES7210 sends four slots down one wire.</dd></div>
+<div id="g-aec"><dt style="font-size: 16px; font-weight: 600;">AEC</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">Acoustic echo cancellation: subtracting what the speaker plays from what the mic hears.</dd></div>
+<div id="g-aec-reference"><dt style="font-size: 16px; font-weight: 600;">AEC reference</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">The copy of the speaker signal the AEC subtracts. On the BOX-3 it arrives on TDM slot 1, measured with micscan.</dd></div>
+<div id="g-afe"><dt style="font-size: 16px; font-weight: 600;">AFE</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">Espressif&#x27;s audio front end. It runs echo cancellation, noise suppression and the wake-word engine.</dd></div>
+<div id="g-wakenet"><dt style="font-size: 16px; font-weight: 600;">WakeNet</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">Espressif&#x27;s on-device wake-word model. Here it listens for “Hi, ESP”, and nothing leaves the box until it hears it.</dd></div>
+<div id="g-half-duplex"><dt style="font-size: 16px; font-weight: 600;">Half duplex</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">One direction at a time: the mic is muted while the box is speaking.</dd></div>
+<div id="g-jitter-buffer"><dt style="font-size: 16px; font-weight: 600;">Jitter buffer</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">Audio held back before playback to smooth out uneven network arrival. Set to zero here, on purpose.</dd></div>
+<div id="g-micscan"><dt style="font-size: 16px; font-weight: 600;">micscan</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">A console command that plays a tone and measures every TDM slot, to find which one carries the AEC reference.</dd></div>
+</dl>
+</div>
+<div style="display: flex; flex-direction: column; gap: 18px;">
+<div style="font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; font-weight: 500; letter-spacing: 0.14em; color: #A2471A; padding-bottom: 10px; border-bottom: 2px solid #1A1917;">HARDWARE AND FIRMWARE</div>
+<dl style="margin: 0; display: flex; flex-direction: column; gap: 16px;">
+<div id="g-esp32-s3"><dt style="font-size: 16px; font-weight: 600;">ESP32-S3</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">Espressif&#x27;s dual-core Wi-Fi microcontroller, the chip inside the BOX-3 and the Korvo-2.</dd></div>
+<div id="g-esp-idf"><dt style="font-size: 16px; font-weight: 600;">ESP-IDF</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">Espressif&#x27;s SDK and build system. This fork uses v5.5.5.</dd></div>
+<div id="g-partition-table"><dt style="font-size: 16px; font-weight: 600;">Partition table</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">How the flash is divided up. Here: a 6 MB slot for the app and a 4 MB slot for the wake-word model.</dd></div>
+<div id="g-psram"><dt style="font-size: 16px; font-weight: 600;">PSRAM</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">External RAM beside the chip, used for large buffers such as the display&#x27;s.</dd></div>
+<div id="g-usb-serial-jtag"><dt style="font-size: 16px; font-weight: 600;">USB-Serial-JTAG</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">The S3&#x27;s built-in USB port for the console, logs and flashing. The BOX-3 has no separate serial chip.</dd></div>
+<div id="g-uart-bridge"><dt style="font-size: 16px; font-weight: 600;">UART bridge</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">A separate USB-to-serial chip, as on the Korvo-2.</dd></div>
+<div id="g-i2c"><dt style="font-size: 16px; font-weight: 600;">I2C</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">A two-wire bus for talking to chips. The DACs sit on the dock&#x27;s bus: SCL on GPIO40, SDA on GPIO41.</dd></div>
+<div id="g-dac7578"><dt style="font-size: 16px; font-weight: 600;">DAC7578</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">TI&#x27;s 8-channel, 12-bit digital-to-analog converter: it turns a number into a voltage.</dd></div>
+<div id="g-vref"><dt style="font-size: 16px; font-weight: 600;">Vref</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">The DAC&#x27;s reference voltage. Output = code ÷ 4095 × Vref, so it has to be measured, not assumed.</dd></div>
+<div id="g-firmware-clamp"><dt style="font-size: 16px; font-weight: 600;">Firmware clamp</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">A limit the firmware enforces whatever the model asks. Out-of-range requests are refused, never clipped.</dd></div>
+<div id="g-lvgl"><dt style="font-size: 16px; font-weight: 600;">LVGL</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">An open-source graphics library for small screens. It draws the status display.</dd></div>
+<div id="g-bsp"><dt style="font-size: 16px; font-weight: 600;">BSP</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">Board support package: Espressif&#x27;s ready-made drivers for a board. Skipped here because it claims both I2C buses.</dd></div>
+<div id="g-vendored-component"><dt style="font-size: 16px; font-weight: 600;">Vendored component</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">A copy of a library kept inside this repo so it can be patched. Here: esp_capture.</dd></div>
+<div id="g-console"><dt style="font-size: 16px; font-weight: 600;">Console</dt><dd style="margin: 4px 0 0; font-size: 14.5px; line-height: 1.5; color: #4F4B44;">The typed command line over USB: start, stop, micscan, vref, dac and more.</dd></div>
+</dl>
+</div>
+</div>
 </div>
 </main>
 </body>
